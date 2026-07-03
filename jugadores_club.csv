@@ -1,31 +1,78 @@
-﻿ID_FIDE;Nombre;Estado_Club
-2231204;Suarez Triguero, Jose Alfonso;Activo
-2228386;Garcia Gonzalo, Jesus;Activo
-2231050;Pajuelo Morales, Raul;Activo
-523006927;Jimenez Diaz, Francisco;Activo
-22227547;Olmedo Moya, Jose Ventura;Activo
-22205365;Palomares Monreal, Francisco Javier;Activo
-94736936;Marin Mataix, Marcos Daniel;Activo
-2270773;Gazpio Blanco, Pedro;Activo
-54728967;Hurtado Garrido, Reyes;Activo
-22205039;Bengoa Moreno, Oscar;Activo
-24569879;Juzgado Niella, Angel Luis;Activo
-94798915;Burbano Sanchez, Luis;Activo
-24547409;Jurado Carretero, Gabriel;Activo
-22205390;"		Piqueras Jimenez, Manuel";Activo
-94798907;Soare Diaconu, David Nicolas;Activo
-94744424;Uberuaga Alvarez, Angel;Activo
-54795729;Martinez Maiz, Juan;Activo
-94759421;Soare Diaconu, Andrei Mihai Silviu;Activo
-22207325;Garcia Lopez, Enrique 1979;Activo
-54734843;Torres Nunez de Prado, Carlos;Activo
-22205551;Alarcon Romero, Marcelino;Activo
-22210652;Torres Borrachero, Jose Miguel;Activo
-54740231;Garcia Garcia, Miguel Angel 1959;Activo
-24547603;Lucas Cuestas, Julio;Activo
-24545287;Perez Gonzalez, Eugenio;Activo
-24571628;Gigorro Gigorro, Manuel;Activo
-54555507;Heras Dominguez, Pedro;Activo
-2213966;Blanco Sanjuan, Jorge;Baja
-2299291;Camacho Casado, Demetrio;Baja
-94708169;Gonzalez de Aleja Lopez, Alvaro;Baja
+﻿ID_FIDE;Nombre;Estado_Club;Elo_Actual;Max_Elo;Fecha_Record
+2231204;Suarez Triguero, Jose Alfonso;Activo;1995;2188;ene-07
+2228386;Garcia Gonzalo, Jesus;Activo;1939;2004;feb-19
+2231050;Pajuelo Morales, Raul;Activo;1931;2043;jul-08
+523006927;Jimenez Diaz, Francisco;Activo;1889;1889;abr-26
+22227547;Olmedo Moya, Jose Ventura;Activo;1772;1835;mar-24
+22205365;Palomares Monreal, Francisco Javier;Activo;1783;1813;ene-25
+94736936;Marin Mataix, Marcos Daniel;Activo;1858;1858;abr-26
+2270773;Gazpio Blanco, Pedro;Activo;1746;1832;jul-09
+54728967;Hurtado Garrido, Reyes;Activo;1840;1846;mar-26
+22205039;Bengoa Moreno, Oscar;Activo;1734;1768;ene-25
+24569879;Juzgado Niella, Angel Luis;Activo;1766;1790;mar-24
+94798915;Burbano Sanchez, Luis;Activo;1668;1716;jun-25
+24547409;Jurado Carretero, Gabriel;Activo;1610;1614;feb-25
+22205390;"		Piqueras Jimenez, Manuel";Activo;1569;1583;mar-25
+94798907;Soare Diaconu, David Nicolas;Activo;1562;1578;mar-25
+94744424;Uberuaga Alvarez, Angel;Activo;1493;1659;mar-24
+54795729;Martinez Maiz, Juan;Activo;1470;1620;mar-24
+94759421;Soare Diaconu, Andrei Mihai Silviu;Activo;1000;1000;jul-26
+22207325;Garcia Lopez, Enrique 1979;Activo;1794;1815;feb-26
+54734843;Torres Nunez de Prado, Carlos;Activo;1714;1863;ene-25
+22205551;Alarcon Romero, Marcelino;Activo;1691;1789;may-12
+22210652;Torres Borrachero, Jose Miguel;Activo;1666;1709;mar-24
+54740231;Garcia Garcia, Miguel Angel 1959;Activo;1543;1601;may-25
+24547603;Lucas Cuestas, Julio;Activo;1572;1590;mar-24
+24545287;Perez Gonzalez, Eugenio;Activo;1579;1621;mar-24
+24571628;Gigorro Gigorro, Manuel;Activo;1445;1472;mar-24
+54555507;Heras Dominguez, Pedro;Activo;1000;1000;jul-26
+2213966;Blanco Sanjuan, Jorge;Baja;2046;2161;abr-03
+2299291;Camacho Casado, Demetrio;Baja;1964;2096;abr-06
+94708169;Gonzalez de Aleja Lopez, Alvaro;Baja;1642;1679;ago-25
+94798923;Calle Torres, Diego Francisco;Baja;1000;1000;jul-26
+523006935;Sanchez Arjona, Teodoro;Baja;1000;1000;jul-26
+94744432;Torres Nunez del Prado, Lorena;Baja;1000;1000;jul-26
+22209441;Pedraza Aguirre, Sergio;Baja;1793;1793;mar-24
+2298910;Pajuelo Morales, Francisco Javier;Baja;1932;1958;ene-22
+24525049;Arnedo Perez, Ramon;Baja;1724;1724;mar-24
+22205012;Barajas Fernandez, Helios;Baja;2123;2134;mar-20
+24515027;Palacios Sanchez, Victor;Baja;1880;1905;sep-25
+54734924;Gimenez Garcia, Sixto Ramon;Baja;1729;1729;mar-24
+54718295;Pop, Paul;Baja;1766;1766;mar-24
+54588910;Ruiz Usabiaga, Juan Antonio;Baja;1674;1674;mar-24
+54734932;Gonzalez Maza, Victor Daniel;Baja;1650;1650;mar-24
+54788854;Cuallado Callejo, Antonio;Baja;1000;1000;jul-26
+2300680;Dominguez Gonzalez, Avelino;Baja;1884;1913;mar-24
+54588898;Neagu, Roberto Florin;Baja;2266;2326;ago-23
+22205306;Moreno Campos, Jose;Baja;1835;1835;mar-24
+22206370;Cubero Bueno, Julio Luis;Baja;1638;1638;mar-24
+22207287;Garcia Guijarro, Rodrigo;Baja;1773;1773;mar-24
+54589940;Moreno Gutierrez, Alejandro;Baja;1619;1619;mar-24
+54734916;Pelaez Herrera, Fernando Javier;Baja;1975;1975;mar-24
+2297957;Cambon Rodriguez, German;Baja;1801;1801;mar-24
+32057164;Benitez Cuevas, Pedro;Baja;1891;1932;ene-26
+185469;Rodriguez, Tiago;Baja;1000;1000;jul-26
+22221263;De Isidro Vazquez, Alfonso;Baja;1984;2085;may-11
+2227282;Tereso Martin, Antonio;Baja;1925;2072;jul-04
+24548987;Tereso Silva, Luis;Baja;1902;1916;mar-26
+22209344;Pacheco De La Rosa, Cesar;Baja;1807;1807;mar-24
+22203281;Garcia Gonzalez, David 1982;Baja;1899;1899;mar-24
+22298428;Garcia Armero, Benjamin;Baja;1871;1871;mar-24
+22207333;Garcia Marques, David;Baja;1813;1813;mar-24
+22207007;Fuentes Megias, Fernando;Baja;1834;1834;mar-24
+22205071;Companys Lopez, Robert;Baja;1861;1861;mar-24
+22205276;Lopez Ramirez, Miguel;Baja;1911;1911;mar-24
+2279304;Sanchez Rodenas, Jose Antonio;Baja;1687;1879;oct-04
+22205209;Gomez Real, Enrique;Baja;1846;1846;mar-24
+22205420;Riojo Serrano, Francisco;Baja;1962;1962;mar-24
+22205357;Olmedo Mata, Jose;Baja;1000;1000;jul-26
+32057580;De La Cruz Lopez, Angel;Baja;1891;1891;mar-24
+24502863;Arias Lopez, Adan;Baja;1793;1793;mar-24
+22210415;Serrano Garcia, Antonio;Baja;1781;1781;mar-24
+22205420;Riojo Serrano, Francisco;Baja;1962;1962;mar-24
+22263446;Del Fresno Jimenez, Sergio;Baja;1000;1000;jul-26
+22205632;Alvarez Penalver, Javier;Baja;1613;1613;mar-24
+22207600;Gomez Real, Maria Del Pilar;Baja;1504;1504;mar-25
+22207333;Garcia Marques, David;Baja;1813;1813;mar-24
+22210474;Sola Lozano, Ramon J.;Baja;1759;1759;mar-24
+22207066;Galan Cardoso, Gessica;Baja;1650;1650;mar-24
