@@ -30,15 +30,15 @@ def cargar_datos_completos():
         st.error(f"Error al leer el archivo de datos: {e}")
         return pd.DataFrame()
 
-# FUNCIÓN NUEVA: Aplica color según el estado del jugador
+# NUEVA GAMA DE COLORES: VERDE SUAVE Y ROJO CLARO
 def colorear_por_estado(row):
     estado = str(row["Estado"]).lower().strip()
     if estado == "baja":
-        # Texto gris tenue y fondo ligeramente rojizo/oscuro para las bajas
-        return ['color: #94a3b8; background-color: #2d1f1f; font-style: italic'] * len(row)
+        # Bajas: Fondo rojo/rosa claro con texto granate oscuro
+        return ['color: #7f1d1d; background-color: #fee2e2; font-style: italic'] * len(row)
     else:
-        # Texto normal (blanco/claro) para activos o altas
-        return [''] * len(row)
+        # Activos/Alta: Fondo verde claro con texto verde bosque
+        return ['color: #064e3b; background-color: #d1fae5; font-weight: 500'] * len(row)
 
 df_base = cargar_datos_completos()
 
@@ -53,7 +53,7 @@ if not df_base.empty:
     ])
 
     # =========================================================
-    # PESTAÑA 1: JUGADORES ACTIVOS (Aquí todos son activos, no hace falta color extra)
+    # PESTAÑA 1: JUGADORES ACTIVOS
     # =========================================================
     with tab_activos:
         st.subheader("Clasificación de Jugadores en Activo")
@@ -74,23 +74,27 @@ if not df_base.empty:
             
         df_act_vista = df_act_filt[["Nombre", "ID_FIDE", "Elo_Actual", "Max_Elo", "Fecha_Record"]].copy()
         df_act_vista.columns = ["Nombre del Jugador", "ID FIDE", "Elo Actual", "Máximo Histórico", "Fecha Récord"]
-        st.dataframe(df_act_vista, use_container_width=True, column_config={"ID FIDE": st.column_config.NumberColumn(format="%d")})
+        
+        # Aplicamos la tabla con estilo verde para los activos
+        st.dataframe(df_act_vista.style.apply(colorear_por_estado, axis=1), use_container_width=True, column_config={"ID FIDE": st.column_config.NumberColumn(format="%d")})
         
         st.markdown("#### 📊 Gráfico: Top 10 Elo Actual")
         top_10_act = df_activos.head(10).sort_values(by="Elo_Actual", ascending=True)
+        
+        # Gráfico adaptado a tonos verdes
         fig_act = px.bar(top_10_act, x="Elo_Actual", y="Nombre", orientation='h', text="Elo_Actual",
-                         color="Elo_Actual", color_continuous_scale=["#334155", "#34d399"])
+                         color="Elo_Actual", color_continuous_scale=["#a7f3d0", "#047857"])
         fig_act.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#f8fafc",
                               showlegend=False, coloraxis_showscale=False, xaxis=dict(visible=False), yaxis=dict(showgrid=False))
         st.plotly_chart(fig_act, use_container_width=True, config={'displayModeBar': False})
 
 
     # =========================================================
-    # PESTAÑA 2: CLUB COMPLETO (Muestra colores para las bajas)
+    # PESTAÑA 2: CLUB COMPLETO (Combina Verde y Rojo)
     # =========================================================
     with tab_general:
         st.subheader("Escalafón General del Club")
-        st.caption("Los jugadores en estado 'Baja' aparecen atenuados en color grisáceo.")
+        st.caption("Los jugadores en activo aparecen en filas verdes y las bajas en filas rojas.")
         
         df_general = df_base.sort_values(by="Elo_Actual", ascending=False).reset_index(drop=True)
         df_general.index = df_general.index + 1
@@ -107,18 +111,16 @@ if not df_base.empty:
         df_gen_vista = df_gen_filt[["Nombre", "ID_FIDE", "Estado_Club", "Elo_Actual", "Max_Elo"]].copy()
         df_gen_vista.columns = ["Nombre del Jugador", "ID FIDE", "Estado", "Elo Actual", "Máximo Histórico"]
         
-        # MAGIA AQUÍ: Usamos .style.apply para colorear la tabla dinámicamente
         df_gen_estilizado = df_gen_vista.style.apply(colorear_por_estado, axis=1)
-        
         st.dataframe(df_gen_estilizado, use_container_width=True, column_config={"ID FIDE": st.column_config.NumberColumn(format="%d")})
 
 
     # =========================================================
-    # PESTAÑA 3: HALL OF FAME (Muestra colores para las bajas si las hay)
+    # PESTAÑA 3: HALL OF FAME
     # =========================================================
     with tab_hof:  
         st.subheader("👑 El Salón de la Fama")
-        st.write("Los 10 techos de Elo más altos alcanzados por jugadores del club. (Las bajas históricas aparecen atenuadas).")
+        st.write("Los 10 techos de Elo más altos alcanzados en la historia del club.")
         
         df_hof = df_base.sort_values(by="Max_Elo", ascending=False).head(10).reset_index(drop=True)
         df_hof.index = df_hof.index + 1
@@ -126,13 +128,13 @@ if not df_base.empty:
         df_hof_vista = df_hof[["Nombre", "ID_FIDE", "Max_Elo", "Fecha_Record", "Elo_Actual", "Estado_Club"]].copy()
         df_hof_vista.columns = ["Leyenda del Club", "ID FIDE", "Récord de Elo", "Fecha del Récord", "Elo Actual", "Estado"]
         
-        # MAGIA AQUÍ TAMBIÉN: Coloreamos el Hall of fame por si alguna leyenda ya no está activa
         df_hof_estilizado = df_hof_vista.style.apply(colorear_por_estado, axis=1)
-        
         st.dataframe(df_hof_estilizado, use_container_width=True, column_config={"ID FIDE": st.column_config.NumberColumn(format="%d")})
         
         st.markdown("#### 📊 Gráfico: Los 10 Techos Históricos del Club")
         top_10_hof = df_hof.sort_values(by="Max_Elo", ascending=True)
+        
+        # Gráfico del Hall of Fame en un degradado corporativo de gris a verde intenso
         fig_hof = px.bar(
             top_10_hof, 
             x="Max_Elo", 
@@ -140,7 +142,7 @@ if not df_base.empty:
             orientation='h', 
             text="Max_Elo",
             color="Max_Elo", 
-            color_continuous_scale=["#451a03", "#f59e0b"],
+            color_continuous_scale=["#64748b", "#059669"],
             labels={"Max_Elo": "Récord de Elo"}
         )
         fig_hof.update_layout(
