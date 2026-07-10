@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # Título principal
-st.title("🏆 Portal de Rankings - C.A. Vallecas Villa")
+st.title("🏆C.A. Vallecas Villa desde 1968")
 st.write("Historial y clasificaciones oficiales del club actualizados mensualmente.")
 
 # Función para cargar y limpiar la base de datos completa
@@ -52,7 +52,7 @@ if not df_base.empty:
     # DEFINICIÓN DE LAS 3 PESTAÑAS PRINCIPALES
     # ---------------------------------------------------------
     tab_activos, tab_general, tab_hof = st.tabs([
-        "🏃 Jugadores Activos", 
+        "🏃 Jugadores en Activo", 
         "👥 Club Completo (Todos)", 
         "👑 Hall of Fame (Top 10)"
     ])
@@ -124,7 +124,7 @@ if not df_base.empty:
     # =========================================================
     with tab_hof:  
         st.subheader("👑 El Salón de la Fama")
-        st.write("Los 10 techos de Elo más altos alcanzados en la historia del club.")
+        st.write("Los 10 techos de Elo más altos alcanzados en la historia por jugadores que han pasado por el club.")
         
         df_hof = df_base.sort_values(by="Max_Elo", ascending=False).head(10).reset_index(drop=True)
         df_hof.index = df_hof.index + 1
