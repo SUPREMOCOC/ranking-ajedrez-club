@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 # Configuración de la página web
 st.set_page_config(
@@ -66,10 +67,35 @@ if not df.empty:
 
     st.markdown("---")
 
-    # 4. Gráfico del Top 10 del Club
+    # 4. Gráfico del Top 10 del Club (Plotly Horizontal con Degradado)
     st.subheader("📊 Top 10 Jugadores con mayor Elo")
-    top_10 = df.head(10)
-    st.bar_chart(data=top_10, x="Nombre", y="Elo_Actual", color="#f59e0b")
+    top_10 = df.head(10).sort_values(by="Elo_Actual", ascending=True)
+    
+    fig = px.bar(
+        top_10, 
+        x="Elo_Actual", 
+        y="Nombre", 
+        orientation='h',
+        text="Elo_Actual",
+        color="Elo_Actual",
+        color_continuous_scale=["#334155", "#f59e0b"],
+        labels={"Elo_Actual": "Elo FIDE", "Nombre": "Jugador"}
+    )
+    
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font_color="#f8fafc",
+        showlegend=False,
+        coloraxis_showscale=False,
+        xaxis=dict(showgrid=False, zeroline=False, visible=False), # Ocultamos el eje X inferior porque el dato ya va dentro de la barra
+        yaxis=dict(showgrid=False),
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=400
+    )
+    fig.update_traces(textposition='inside', insidetextanchor='end', marker_line_color='rgba(0,0,0,0)')
+    
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 else:
     st.warning("Aún no hay datos de jugadores disponibles en el repositorio.")
