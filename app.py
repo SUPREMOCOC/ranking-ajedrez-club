@@ -10,7 +10,8 @@ st.set_page_config(
 )
 
 # Título principal
-st.title("🏆C.A. Vallecas Villa desde 1968")
+st.title("🏆C.A. Vallecas Villa")
+st.subtitle("Desde 1968)
 st.write("Historial y clasificaciones oficiales del club actualizados mensualmente.")
 
 # Función para cargar y limpiar la base de datos completa
