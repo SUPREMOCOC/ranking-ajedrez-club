@@ -3,14 +3,14 @@ import pandas as pd
 
 # Configuración de la página web
 st.set_page_config(
-    page_title="Ranking FIDE | Club de Ajedrez",
+    page_title="Club de Ajedrez Vallecas Villa",
     page_icon="🏆",
     layout="centered"
 )
 
 # Título principal
-st.title("🏆 Ranking FIDE del Club")
-st.write("Clasificación actualizada automáticamente a partir de las listas oficiales de la FIDE.")
+st.title("🏆 Ranking FIDE del Club de Ajedrez Vallecas Villa")
+st.write("Clasificación actualizada automáticamente de forma mensual a partir de las listas oficiales de la FIDE.")
 
 # Función para cargar y limpiar datos
 @st.cache_data(ttl=3600)  # Limpia la caché cada hora para captar actualizaciones
