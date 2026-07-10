@@ -18,10 +18,14 @@ st.write("Historial y clasificaciones oficiales del club actualizados mensualmen
 def cargar_datos_completos():
     try:
         df = pd.read_csv("jugadores_club.csv", sep=";")
-        # Limpieza básica de datos comunes
+        # Asegurar que el Elo sea numérico
         df["Elo_Actual"] = pd.to_numeric(df["Elo_Actual"], errors='coerce').fillna(0).astype(int)
         df["Max_Elo"] = pd.to_numeric(df["Max_Elo"], errors='coerce').fillna(0).astype(int)
-        df["Nombre"] = df["Nombre"].strip()
+        
+        # CORRECCIÓN AQUÍ: Usamos .str.strip() para limpiar los espacios en blanco de toda la columna
+        df["Nombre"] = df["Nombre"].astype(str).str.strip()
+        df["Estado_Club"] = df["Estado_Club"].astype(str).str.strip()
+        
         return df
     except Exception as e:
         st.error(f"Error al leer el archivo de datos: {e}")
@@ -99,7 +103,7 @@ if not df_base.empty:
         if buscar_gen:
             df_gen_filt = df_general[df_general["Nombre"].str.contains(buscar_gen, case=False, na=False)]
             
-        # Tabla Vista (Añadimos la columna Estado_Club para diferenciarlos)
+        # Tabla Vista
         df_gen_vista = df_gen_filt[["Nombre", "ID_FIDE", "Estado_Club", "Elo_Actual", "Max_Elo"]].copy()
         df_gen_vista.columns = ["Nombre del Jugador", "ID FIDE", "Estado", "Elo Actual", "Máximo Histórico"]
         st.dataframe(df_gen_vista, use_container_width=True, column_config={"ID FIDE": st.column_config.NumberColumn(format="%d")})
@@ -108,22 +112,19 @@ if not df_base.empty:
     # =========================================================
     # PESTAÑA 3: HALL OF FAME (TOP 10 HIGHEST RATINGS EVER)
     # =========================================================
-    with tab_of_fame:
+    with tab_hof:  # Nota: se corrigió también el nombre de la variable aquí
         st.subheader("👑 El Salón de la Fama")
         st.write("Los 10 techos de Elo más altos alcanzados por jugadores del club en toda su historia.")
         
-        # El truco: Ordenamos por 'Max_Elo' en vez de Elo actual, y nos quedamos solo con los 10 mejores
+        # Ordenar por 'Max_Elo' y tomar el top 10
         df_hof = df_base.sort_values(by="Max_Elo", ascending=False).head(10).reset_index(drop=True)
         df_hof.index = df_hof.index + 1
         
-        # Modificación visual para el podio del Hall of Fame
         df_hof_vista = df_hof[["Nombre", "ID_FIDE", "Max_Elo", "Fecha_Record", "Elo_Actual", "Estado_Club"]].copy()
         df_hof_vista.columns = ["Leyenda del Club", "ID FIDE", "Récord de Elo", "Fecha del Récord", "Elo Actual", "Estado"]
-        
-        # Renderizar la tabla del olimpo
         st.dataframe(df_hof_vista, use_container_width=True, column_config={"ID FIDE": st.column_config.NumberColumn(format="%d")})
         
-        # Gráfico especial de Leyendas (En tonos dorados/oro)
+        # Gráfico de Leyendas (Tonos dorados)
         st.markdown("#### 📊 Gráfico: Los 10 Techos Históricos del Club")
         top_10_hof = df_hof.sort_values(by="Max_Elo", ascending=True)
         fig_hof = px.bar(
@@ -133,7 +134,7 @@ if not df_base.empty:
             orientation='h', 
             text="Max_Elo",
             color="Max_Elo", 
-            color_continuous_scale=["#451a03", "#f59e0b"], # Degradado marrón/oro viejo a oro brillante
+            color_continuous_scale=["#451a03", "#f59e0b"],
             labels={"Max_Elo": "Récord de Elo"}
         )
         fig_hof.update_layout(
