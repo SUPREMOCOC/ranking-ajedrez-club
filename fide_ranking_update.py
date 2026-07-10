@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Optional
 
 import requests
-
+import cloudscraper
 # ---------------------------------------------------------------------------
 # Configuración
 # ---------------------------------------------------------------------------
@@ -69,7 +69,11 @@ def fecha_formato_club(d: Optional[date] = None) -> str:
 def descargar_xml_fide(url: str = FIDE_XML_URL) -> bytes:
     """Descarga el .zip del listado FIDE y devuelve los bytes del XML interior."""
     headers = {"User-Agent": "Mozilla/5.0 (compatible; ClubChessRankingBot/1.0)"}
-    resp = requests.get(url, headers=headers, timeout=180)
+  # Creamos el navegador falso que engaña a Cloudflare
+scraper = cloudscraper.create_scraper()
+
+# Hacemos la petición (quitamos los 'headers' porque el scraper ya pone unos reales automáticamente)
+resp = scraper.get(url, timeout=180)
     resp.raise_for_status()
     with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
         xml_names = [n for n in zf.namelist() if n.lower().endswith(".xml")]
