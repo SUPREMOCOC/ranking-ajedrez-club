@@ -14,7 +14,7 @@ from typing import Optional
 import requests
 import cloudscraper
 
-FIDE_XML_URL = "https://ratings.fide.com/download/players_list_xml.zip"
+FIDE_XML_URL = "https://ratings.fide.com/download/standard_rating_list_xml.zip"
 FIDE_DOWNLOAD_PAGE = "https://ratings.fide.com/download_lists.phtml"
 
 CSV_DELIMITER = ";"
