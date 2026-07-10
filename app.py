@@ -10,7 +10,7 @@ st.set_page_config(
 )
 
 # Título principal
-st.title("🏆C.A. Vallecas Villa")
+st.title("🏆Club de Ajedrez Vallecas Villa")
 st.subheader("Desde 1968")
 st.write("Historial y clasificaciones oficiales del club actualizados mensualmente.")
 
