@@ -2,7 +2,10 @@ name: Actualizar ranking FIDE del club
 
 on:
   schedule:
-    - cron: '0 6 3 * *'
+    # Día 10 de cada mes a las 06:00 UTC. La FIDE publica el listado el
+    # día 1, pero esos primeros días recibe mucho tráfico y a veces da
+    # timeouts — esperamos más margen para evitar la hora punta.
+    - cron: '0 6 10 * *'
   workflow_dispatch: {}
 
 permissions:
@@ -23,6 +26,14 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
+      - name: Diagnóstico de conectividad con la FIDE
+        continue-on-error: true
+        run: |
+          echo "--- curl -I (solo cabeceras) ---"
+          curl -I --max-time 30 -A "Mozilla/5.0" https://ratings.fide.com/download/players_list_xml.zip || true
+          echo "--- ping (puede estar bloqueado igualmente, es informativo) ---"
+          curl -sS --max-time 15 -o /dev/null -w "HTTP %{http_code}, tiempo total %{time_total}s\n" https://ratings.fide.com/ || true
+
       - name: Ejecutar actualización del ranking
         run: python fide_ranking_update.py --csv jugadores_club.csv
 
@@ -37,7 +48,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add jugadores_club.csv historial_elos.csv
+          git add jugadores_club.csv
           if git diff --cached --quiet; then
             echo "Sin cambios en el ranking este mes."
           else
