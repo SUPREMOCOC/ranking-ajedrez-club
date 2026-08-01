@@ -140,7 +140,7 @@ if not df_base.empty:
             showlegend=False, coloraxis_showscale=False, xaxis=dict(visible=False), yaxis=dict(showgrid=False))
         st.plotly_chart(fig_hof, use_container_width=True, config={'displayModeBar': False})
 
-    # =========================================================
+# =========================================================
     # PESTAÑA 4: EVOLUCIÓN ELO (CON ESTADÍSTICAS)
     # =========================================================
     with tab_evolucion:
@@ -167,57 +167,75 @@ if not df_base.empty:
                 df_melted = df_melted.dropna(subset=["Elo"])
                 df_melted = df_melted[df_melted["Elo"] > 0]
                 
-                if df_melted.empty:
-                    st.warning("No hay historial numérico de Elo para los jugadores seleccionados.")
-                else:
-                    # Dibujamos la gráfica primero
+                # Dibujamos la gráfica si hay datos
+                if not df_melted.empty:
                     fig_line = px.line(df_melted, x="Mes", y="Elo", color="Nombre", markers=True)
                     fig_line.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', hovermode="x unified")
                     st.plotly_chart(fig_line, use_container_width=True)
+                
+                # -----------------------------------------------------------------
+                # TARJETAS DE RENDIMIENTO DE CADA JUGADOR SELECCIONADO
+                # -----------------------------------------------------------------
+                st.markdown("### 📊 Análisis de Rendimiento")
+                
+                for jugador in jugadores_elegidos:
+                    df_jug = df_melted[df_melted["Nombre"] == jugador]
                     
-                    # -----------------------------------------------------------------
-                    # MAGIA NUEVA: TARJETAS DE RENDIMIENTO DE CADA JUGADOR SELECCIONADO
-                    # -----------------------------------------------------------------
-                    st.markdown("### 📊 Análisis de Rendimiento")
+                    # Recuperamos los datos fijos base por si no tiene historial
+                    datos_fijos = df_base[df_base["Nombre"] == jugador].iloc[0]
+                    elo_fijo_actual = int(datos_fijos["Elo_Actual"])
                     
-                    for jugador in jugadores_elegidos:
-                        df_jug = df_melted[df_melted["Nombre"] == jugador]
+                    st.write(f"**Estadísticas de {jugador}:**")
+                    
+                    if len(df_jug) > 1: 
+                        # Caso A: Tiene 2 o más meses registrados (Cálculo normal)
+                        elo_actual = int(df_jug["Elo"].iloc[-1])
+                        mes_actual = df_jug["Mes"].iloc[-1]
                         
-                        if len(df_jug) > 1: # Si tiene al menos 2 meses de datos
-                            elo_actual = int(df_jug["Elo"].iloc[-1])
-                            mes_actual = df_jug["Mes"].iloc[-1]
-                            
-                            # Variación Histórica (Desde su primer mes registrado)
-                            elo_inicial = int(df_jug["Elo"].iloc[0])
-                            mes_inicial = df_jug["Mes"].iloc[0]
-                            variacion_total = elo_actual - elo_inicial
-                            
-                            # Variación a corto plazo (Hace 12 meses aprox, o su primer registro si lleva menos tiempo)
-                            idx_historico = -13 if len(df_jug) >= 13 else 0
-                            elo_1_ano = int(df_jug["Elo"].iloc[idx_historico])
-                            mes_1_ano = df_jug["Mes"].iloc[idx_historico]
-                            variacion_1_ano = elo_actual - elo_1_ano
-                            
-                            pico_max = int(df_jug["Elo"].max())
-                            
-                            st.write(f"**Estadísticas de {jugador}:**")
-                            col1, col2, col3 = st.columns(3)
-                            
-                            # Muestra Elo actual y la flecha con lo que ha ganado/perdido desde el principio
-                            col1.metric(label=f"Variación Total (Desde {mes_inicial})", value=elo_actual, delta=f"{variacion_total} puntos")
-                            
-                            # Muestra la variación en el último año/temporada
-                            if len(df_jug) >= 13:
-                                col2.metric(label=f"Último Año (Desde {mes_1_ano})", value=elo_actual, delta=f"{variacion_1_ano} puntos")
-                            else:
-                                col2.metric(label="Variación Reciente", value=elo_actual, delta=f"{variacion_1_ano} puntos")
-                            
-                            # Muestra el pico máximo y cuánto le falta para recuperarlo (si ha bajado)
-                            distancia_pico = elo_actual - pico_max
-                            col3.metric(label="Pico de Elo", value=pico_max, delta=f"{distancia_pico} al récord" if distancia_pico < 0 else "¡En su Récord!")
-                            st.divider() # Pone una línea separadora bonita
+                        elo_inicial = int(df_jug["Elo"].iloc[0])
+                        mes_inicial = df_jug["Mes"].iloc[0]
+                        variacion_total = elo_actual - elo_inicial
+                        
+                        idx_historico = -13 if len(df_jug) >= 13 else 0
+                        elo_1_ano = int(df_jug["Elo"].iloc[idx_historico])
+                        mes_1_ano = df_jug["Mes"].iloc[idx_historico]
+                        variacion_1_ano = elo_actual - elo_1_ano
+                        
+                        pico_max = max(int(df_jug["Elo"].max()), int(datos_fijos["Max_Elo"]))
+                        
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric(label=f"Variación Total (Desde {mes_inicial})", value=elo_actual, delta=f"{variacion_total} puntos")
+                        
+                        if len(df_jug) >= 13:
+                            col2.metric(label=f"Último Año (Desde {mes_1_ano})", value=elo_actual, delta=f"{variacion_1_ano} puntos")
                         else:
-                            st.info(f"Faltan datos históricos para analizar a {jugador}.")
+                            col2.metric(label="Variación Reciente", value=elo_actual, delta=f"{variacion_1_ano} puntos")
+                        
+                        distancia_pico = elo_actual - pico_max
+                        col3.metric(label="Pico de Elo", value=pico_max, delta=f"{distancia_pico} al récord" if distancia_pico < 0 else "¡En su Récord!")
+                        st.divider()
+                        
+                    elif len(df_jug) == 1:
+                        # Caso B: Tiene solo 1 mes de historial (Es nuevo en las columnas de meses)
+                        elo_actual = int(df_jug["Elo"].iloc[0])
+                        mes_actual = df_jug["Mes"].iloc[0]
+                        pico_max = max(elo_actual, int(datos_fijos["Max_Elo"]))
+                        
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric(label=f"Primer registro ({mes_actual})", value=elo_actual, delta="Nuevo")
+                        col2.metric(label="Variación", value=elo_actual, delta="Sin historial previo", delta_color="off")
+                        
+                        distancia_pico = elo_actual - pico_max
+                        col3.metric(label="Pico de Elo", value=pico_max, delta=f"{distancia_pico} al récord" if distancia_pico < 0 else "¡En su Récord!")
+                        st.divider()
+                        
+                    else:
+                        # Caso C: 0 meses registrados (Aún no tiene datos en las columnas de los meses)
+                        if elo_fijo_actual > 0:
+                            st.info(f"💡 **{jugador}** tiene **{elo_fijo_actual} de Elo**, pero aún no se han rellenado sus datos en las columnas mensuales (Ene_2024, Feb_2024...) para poder analizar su evolución.")
+                        else:
+                            st.info(f"💡 **{jugador}** no tiene Elo FIDE registrado actualmente.")
+                        st.divider()
 
 else:
     st.warning("Aún no hay datos de jugadores disponibles.")
