@@ -255,6 +255,50 @@ def actualizar_filas(
     }
 
 
+def tomar_snapshot_actual(filas: list[dict[str, str]], col_mes_actual: str) -> dict:
+    """
+    Copia el valor que YA HAY en Elo_Actual a la columna histórica del mes,
+    para los jugadores activos, sin descargar nada de la FIDE.
+
+    Útil una única vez para no perder el dato actual justo antes de que la
+    siguiente ejecución normal lo sobrescriba con el rating nuevo.
+    """
+    capturados = []       # (nombre, elo)
+    vacios = []            # activos sin Elo_Actual con el que hacer snapshot
+    saltados_no_activos = 0
+
+    for fila in filas:
+        fila.setdefault(col_mes_actual, "")
+
+        estado = normaliza(fila.get("Estado_Club", ""))
+        if estado not in ESTADOS_ACTIVOS:
+            saltados_no_activos += 1
+            continue
+
+        elo_actual = (fila.get("Elo_Actual") or "").strip()
+        if elo_actual:
+            fila[col_mes_actual] = elo_actual
+            capturados.append((fila["Nombre"], elo_actual))
+        else:
+            vacios.append(fila.get("Nombre", ""))
+
+    return {
+        "capturados": capturados,
+        "vacios": vacios,
+        "saltados_no_activos": saltados_no_activos,
+    }
+
+
+def generar_resumen_snapshot(r: dict, col_mes_actual: str) -> str:
+    L = [f"## Snapshot manual — columna {col_mes_actual}", ""]
+    L.append(f"- Jugadores capturados desde Elo_Actual: **{len(r['capturados'])}**")
+    L.append(f"- Jugadores no activos (Baja) omitidos: {r['saltados_no_activos']}")
+    if r["vacios"]:
+        L.append(f"- Activos sin Elo_Actual (no se ha podido capturar nada): {len(r['vacios'])}")
+    L.append("")
+    return "\n".join(L)
+
+
 def generar_resumen(r: dict, fecha_hoy: str, col_mes_actual: str) -> str:
     L = [f"## Actualización ranking FIDE — {fecha_hoy}", ""]
     L.append(f"- Columna histórica de este mes: **{col_mes_actual}**")
@@ -301,10 +345,34 @@ def main() -> None:
                          help="Fichero donde volcar el resumen en Markdown")
     parser.add_argument("--dry-run", action="store_true",
                          help="Calcula los cambios pero no escribe el CSV")
+    parser.add_argument("--snapshot-actual", action="store_true",
+                         help=(
+                             "En vez de descargar el listado FIDE, copia el Elo_Actual "
+                             "que ya hay en el CSV a la columna histórica del mes en curso. "
+                             "Útil una sola vez para no perder el dato actual antes de la "
+                             "primera actualización automática con histórico."
+                         ))
     args = parser.parse_args()
 
     if not args.csv.exists():
         sys.exit(f"ERROR: no se encuentra el CSV: {args.csv}")
+
+    if args.snapshot_actual:
+        filas, fieldnames_existentes = leer_csv(args.csv)
+        col_mes_actual = columna_mes_actual()
+        fieldnames_finales = ordenar_columnas(fieldnames_existentes, col_mes_actual)
+
+        resultado = tomar_snapshot_actual(filas, col_mes_actual)
+        resumen = generar_resumen_snapshot(resultado, col_mes_actual)
+        print(resumen)
+        args.summary.write_text(resumen, encoding="utf-8")
+
+        if args.dry_run:
+            print("[--dry-run] No se ha modificado el CSV.")
+        else:
+            escribir_csv(args.csv, filas, fieldnames_finales)
+            print(f"CSV actualizado: {args.csv}")
+        return
 
     print(f"Descargando listado FIDE desde: {args.fide_url}")
     try:
