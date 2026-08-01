@@ -6,7 +6,16 @@ on:
     # día 1, pero esos primeros días recibe mucho tráfico y a veces da
     # timeouts — esperamos más margen para evitar la hora punta.
     - cron: '0 6 10 * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'Modo de ejecución'
+        required: true
+        default: 'actualizar_fide'
+        type: choice
+        options:
+          - actualizar_fide
+          - snapshot_actual
 
 permissions:
   contents: write
@@ -27,6 +36,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Diagnóstico de conectividad con la FIDE
+        if: github.event.inputs.modo != 'snapshot_actual'
         continue-on-error: true
         run: |
           echo "--- curl -I (solo cabeceras) ---"
@@ -35,7 +45,14 @@ jobs:
           curl -sS --max-time 15 -o /dev/null -w "HTTP %{http_code}, tiempo total %{time_total}s\n" https://ratings.fide.com/ || true
 
       - name: Ejecutar actualización del ranking
-        run: python fide_ranking_update.py --csv jugadores_club.csv
+        run: |
+          MODO="${{ github.event.inputs.modo }}"
+          if [ "$MODO" = "snapshot_actual" ]; then
+            echo "Modo snapshot: copiando Elo_Actual a la columna del mes, sin contactar con la FIDE."
+            python fide_ranking_update.py --csv jugadores_club.csv --snapshot-actual
+          else
+            python fide_ranking_update.py --csv jugadores_club.csv
+          fi
 
       - name: Añadir resumen a la ejecución
         if: always()
