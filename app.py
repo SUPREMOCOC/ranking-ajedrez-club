@@ -174,7 +174,7 @@ if not df_base.empty:
             st.plotly_chart(fig_hof, use_container_width=True, config={'displayModeBar': False})
 
     # =========================================================
-    # PESTAÑA 4: EVOLUCIÓN ELO Y RENDIMIENTO PERSONALIZADO
+    # PESTAÑA 4: EVOLUCIÓN ELO Y RENDIMIENTO
     # =========================================================
     with tab_evolucion:
         st.subheader("📈 Evolución Histórica de Elo")
@@ -210,54 +210,69 @@ if not df_base.empty:
                     st.plotly_chart(fig_line, use_container_width=True)
                 
                 # -----------------------------------------------------------------
-                # SECCIÓN NUEVA: FILTRO DE FECHAS PERSONALIZADO PARA EL RENDIMIENTO
+                # ANÁLISIS DE RENDIMIENTO (Último mes, Último año, Rango Personalizado, Pico)
                 # -----------------------------------------------------------------
                 st.markdown("---")
-                st.markdown("### 🎯 Análisis de Rendimiento por Fechas")
-                st.write("Selecciona un período de tiempo específico para calcular las variaciones de Elo:")
+                st.markdown("### 📊 Análisis de Rendimiento Detallado")
                 
+                # Selectores para el rango personalizado
+                st.write("Selecciona un período de tiempo personalizado:")
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
-                    mes_inicio_sel = st.selectbox("📅 Fecha de Inicio:", options=columnas_meses, index=0)
+                    mes_inicio_sel = st.selectbox("📅 Fecha de Inicio:", options=columnas_meses, index=0, key="ini_custom")
                 with col_f2:
-                    mes_fin_sel = st.selectbox("📅 Fecha de Fin:", options=columnas_meses, index=len(columnas_meses)-1)
+                    mes_fin_sel = st.selectbox("📅 Fecha de Fin:", options=columnas_meses, index=len(columnas_meses)-1, key="fin_custom")
                 
                 for jugador in jugadores_elegidos:
                     df_jug = df_melted[df_melted["Nombre"] == jugador]
                     datos_fijos = df_base[df_base["Nombre"] == jugador].iloc[0]
                     max_historico_fijo = int(datos_fijos["Max_Elo"]) if pd.notna(datos_fijos["Max_Elo"]) else 0
                     
-                    st.write(f"**Estadísticas de {jugador}:**")
+                    st.write(f"**♟️ Estadísticas de {jugador}:**")
                     
                     if not df_jug.empty:
-                        # Buscamos los valores exactos para los meses seleccionados
+                        elo_actual = int(df_jug["Elo"].iloc[-1])
+                        pico_max = max(int(df_jug["Elo"].max()), max_historico_fijo)
+                        
+                        # 1. Variación del Último Mes
+                        if len(df_jug) >= 2:
+                            elo_prev_mes = int(df_jug["Elo"].iloc[-2])
+                            dif_mes = elo_actual - elo_prev_mes
+                            label_mes = f"Mes Ant. ({df_jug['Mes'].iloc[-2]})"
+                        else:
+                            dif_mes = 0
+                            label_mes = "Mes Anterior"
+                            
+                        # 2. Variación del Último Año (12 meses atrás o inicio)
+                        if len(df_jug) >= 13:
+                            elo_prev_ano = int(df_jug["Elo"].iloc[-13])
+                            label_ano = f"Hace 1 Año ({df_jug['Mes'].iloc[-13]})"
+                            dif_ano = elo_actual - elo_prev_ano
+                        elif len(df_jug) > 1:
+                            elo_prev_ano = int(df_jug["Elo"].iloc[0])
+                            label_ano = f"Desde Inicio ({df_jug['Mes'].iloc[0]})"
+                            dif_ano = elo_actual - elo_prev_ano
+                        else:
+                            dif_ano = 0
+                            label_ano = "Último Año"
+
+                        # Primera fila de métricas: Último Mes, Último Año, Pico
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric(label="🗓️ Último Mes", value=elo_actual, delta=f"{dif_mes:+d} pts")
+                        col2.metric(label=f"📅 {label_ano}", value=elo_actual, delta=f"{dif_ano:+d} pts")
+                        
+                        distancia_pico = elo_actual - pico_max
+                        col3.metric(label="👑 Pico de Elo", value=pico_max, delta=f"{distancia_pico} al récord" if distancia_pico < 0 else "¡En su Récord!")
+                        
+                        # Segunda fila: Rango personalizado seleccionado con los desplegables
                         val_inicio = df_jug[df_jug["Mes"] == mes_inicio_sel]["Elo"]
                         val_fin = df_jug[df_jug["Mes"] == mes_fin_sel]["Elo"]
                         
-                        pico_max = max(int(df_jug["Elo"].max()), max_historico_fijo)
-                        
-                        col1, col2, col3 = st.columns(3)
-                        
-                        # 1. Variación entre las fechas elegidas
                         if not val_inicio.empty and not val_fin.empty:
                             elo_ini = int(val_inicio.values[0])
                             elo_fin = int(val_fin.values[0])
                             dif_personalizada = elo_fin - elo_ini
-                            col1.metric(label=f"Variación ({mes_inicio_sel} a {mes_fin_sel})", value=elo_fin, delta=f"{dif_personalizada:+d} puntos")
-                        else:
-                            col1.metric(label="Variación Personalizada", value="Sin datos", delta="Revisa fechas", delta_color="off")
-                        
-                        # 2. Variación Total Histórica (Desde su primer registro en la base)
-                        elo_primero = int(df_jug["Elo"].iloc[0])
-                        mes_primero = df_jug["Mes"].iloc[0]
-                        elo_ultimo = int(df_jug["Elo"].iloc[-1])
-                        dif_total = elo_ultimo - elo_primero
-                        col2.metric(label=f"Histórica (Desde {mes_primero})", value=elo_ultimo, delta=f"{dif_total:+d} puntos")
-                        
-                        # 3. Pico de Elo y distancia actual
-                        elo_actual_ref = int(val_fin.values[0]) if not val_fin.empty else int(df_jug["Elo"].iloc[-1])
-                        distancia_pico = elo_actual_ref - pico_max
-                        col3.metric(label="Pico de Elo", value=pico_max, delta=f"{distancia_pico} al récord" if distancia_pico < 0 else "¡En su Récord!")
+                            st.metric(label=f"🎯 Rango Personalizado ({mes_inicio_sel} $\rightarrow$ {mes_fin_sel})", value=elo_fin, delta=f"{dif_personalizada:+d} puntos")
                         
                         st.divider()
                     else:
