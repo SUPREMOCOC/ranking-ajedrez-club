@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import re
 import sys
 import unicodedata
 import zipfile
@@ -40,7 +41,14 @@ FIDE_DOWNLOAD_PAGE = "https://ratings.fide.com/download_lists.phtml"
 
 CSV_DELIMITER = ";"
 CSV_ENCODING = "utf-8-sig"  # conserva el BOM que ya trae el fichero del club
-CAMPOS = ["ID_FIDE", "Nombre", "Estado_Club", "Elo_Actual", "Max_Elo", "Fecha_Record"]
+
+# Columnas fijas que siempre existen, en este orden.
+CAMPOS_BASE = ["ID_FIDE", "Nombre", "Estado_Club", "Elo_Actual", "Max_Elo", "Fecha_Record"]
+
+# Además de las fijas, cada mes se añade (o actualiza) una columna con el
+# Elo de ese mes, con formato "Elo_AAAA-MM" (p. ej. "Elo_2026-07"), para
+# poder consultar la evolución histórica de cada jugador.
+PATRON_COL_HISTORICA = re.compile(r"^Elo_(\d{4})-(\d{2})$")
 
 # Estados del club que se consideran "jugador activo" (se compara en
 # minúsculas y sin tildes, así que "Activo", "ACTIVO" o "Alta" valen igual).
@@ -60,6 +68,24 @@ def fecha_formato_club(d: Optional[date] = None) -> str:
     """Devuelve la fecha en el mismo formato que ya usa el CSV: 'jul-26'."""
     d = d or date.today()
     return f"{MESES_ES[d.month - 1]}-{d.strftime('%y')}"
+
+
+def columna_mes_actual(d: Optional[date] = None) -> str:
+    """Nombre de la columna histórica del mes, p. ej. 'Elo_2026-07'."""
+    d = d or date.today()
+    return f"Elo_{d.strftime('%Y-%m')}"
+
+
+def ordenar_columnas(fieldnames_existentes: list[str], col_mes_actual: str) -> list[str]:
+    """
+    Devuelve la lista completa y ordenada de columnas: las fijas primero,
+    luego todas las columnas históricas "Elo_AAAA-MM" en orden cronológico
+    (incluyendo la del mes actual aunque sea nueva).
+    """
+    historicas = {c for c in fieldnames_existentes if PATRON_COL_HISTORICA.match(c)}
+    historicas.add(col_mes_actual)
+    historicas_ordenadas = sorted(historicas, key=lambda c: PATRON_COL_HISTORICA.match(c).groups())
+    return CAMPOS_BASE + historicas_ordenadas
 
 
 # ---------------------------------------------------------------------------
@@ -147,20 +173,23 @@ def parsear_ratings(xml_bytes: bytes) -> dict[str, int]:
 # CSV del club
 # ---------------------------------------------------------------------------
 
-def leer_csv(ruta: Path) -> list[dict[str, str]]:
+def leer_csv(ruta: Path) -> tuple[list[dict[str, str]], list[str]]:
     with ruta.open("r", encoding=CSV_ENCODING, newline="") as f:
         reader = csv.DictReader(f, delimiter=CSV_DELIMITER)
-        if reader.fieldnames != CAMPOS:
+        fieldnames = list(reader.fieldnames or [])
+        faltantes = [c for c in CAMPOS_BASE if c not in fieldnames]
+        if faltantes:
             raise ValueError(
-                f"Cabecera inesperada en {ruta}: {reader.fieldnames} "
-                f"(se esperaba {CAMPOS})"
+                f"Faltan columnas obligatorias en {ruta}: {faltantes} "
+                f"(cabecera encontrada: {fieldnames})"
             )
-        return [dict(fila) for fila in reader if any(fila.values())]
+        filas = [dict(fila) for fila in reader if any(fila.values())]
+        return filas, fieldnames
 
 
-def escribir_csv(ruta: Path, filas: list[dict[str, str]]) -> None:
+def escribir_csv(ruta: Path, filas: list[dict[str, str]], fieldnames: list[str]) -> None:
     with ruta.open("w", encoding=CSV_ENCODING, newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=CAMPOS, delimiter=CSV_DELIMITER)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=CSV_DELIMITER, restval="")
         writer.writeheader()
         writer.writerows(filas)
 
@@ -172,6 +201,7 @@ def escribir_csv(ruta: Path, filas: list[dict[str, str]]) -> None:
 def actualizar_filas(
     filas: list[dict[str, str]],
     ratings: dict[str, int],
+    col_mes_actual: str,
     hoy: Optional[date] = None,
 ) -> dict:
     fecha_hoy = fecha_formato_club(hoy)
@@ -183,6 +213,10 @@ def actualizar_filas(
     saltados_no_activos = 0
 
     for fila in filas:
+        # Asegura que la columna del mes existe en todas las filas, aunque
+        # sea la primera vez que se usa (jugadores Baja se quedan en blanco).
+        fila.setdefault(col_mes_actual, "")
+
         estado = normaliza(fila.get("Estado_Club", ""))
         if estado not in ESTADOS_ACTIVOS:
             saltados_no_activos += 1
@@ -198,6 +232,10 @@ def actualizar_filas(
 
         elo_previo = int(fila["Elo_Actual"])
         max_previo = int(fila["Max_Elo"])
+
+        # Registro histórico de este mes: siempre se guarda el rating leído
+        # hoy, aunque no haya cambiado respecto al mes anterior.
+        fila[col_mes_actual] = str(nuevo_elo)
 
         if nuevo_elo != elo_previo:
             cambios_elo.append((fila["Nombre"], elo_previo, nuevo_elo))
@@ -217,8 +255,9 @@ def actualizar_filas(
     }
 
 
-def generar_resumen(r: dict, fecha_hoy: str) -> str:
+def generar_resumen(r: dict, fecha_hoy: str, col_mes_actual: str) -> str:
     L = [f"## Actualización ranking FIDE — {fecha_hoy}", ""]
+    L.append(f"- Columna histórica de este mes: **{col_mes_actual}**")
     L.append(f"- Jugadores activos/alta revisados: **{r['activos_revisados']}**")
     L.append(f"- Jugadores no activos (Baja) omitidos: {r['saltados_no_activos']}")
     L.append(f"- Elo actualizado: **{len(r['cambios_elo'])}**")
@@ -281,17 +320,20 @@ def main() -> None:
     ratings = parsear_ratings(xml_bytes)
     print(f"Listado FIDE parseado correctamente: {len(ratings)} jugadores con rating estándar vigente.")
 
-    filas = leer_csv(args.csv)
-    resultado = actualizar_filas(filas, ratings)
+    filas, fieldnames_existentes = leer_csv(args.csv)
+    col_mes_actual = columna_mes_actual()
+    fieldnames_finales = ordenar_columnas(fieldnames_existentes, col_mes_actual)
 
-    resumen = generar_resumen(resultado, fecha_formato_club())
+    resultado = actualizar_filas(filas, ratings, col_mes_actual)
+
+    resumen = generar_resumen(resultado, fecha_formato_club(), col_mes_actual)
     print("\n" + resumen)
     args.summary.write_text(resumen, encoding="utf-8")
 
     if args.dry_run:
         print("\n[--dry-run] No se ha modificado el CSV.")
     else:
-        escribir_csv(args.csv, filas)
+        escribir_csv(args.csv, filas, fieldnames_finales)
         print(f"\nCSV actualizado: {args.csv}")
 
 
