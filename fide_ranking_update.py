@@ -58,10 +58,6 @@ CAMPOS_BASE = ["ID_FIDE", "Nombre", "Estado_Club", "Elo_Actual", "Max_Elo", "Fec
 # poder consultar la evolución histórica de cada jugador.
 PATRON_COL_HISTORICA = re.compile(r"^Elo_(\d{4})-(\d{2})$")
 
-# Estados del club que se consideran "jugador activo" (se compara en
-# minúsculas y sin tildes, así que "Activo", "ACTIVO" o "Alta" valen igual).
-ESTADOS_ACTIVOS = {"activo", "alta"}
-
 MESES_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 
@@ -235,25 +231,27 @@ def actualizar_filas(
     col_mes_actual: str,
     hoy: Optional[date] = None,
 ) -> dict:
+    """
+    Actualiza el Elo de TODOS los jugadores del CSV que aparezcan en el
+    listado de la FIDE, independientemente de su Estado_Club (Activo, Alta
+    o Baja incluidos) — hay socios dados de baja del club que siguen
+    jugando en otros clubes, y también queremos su Elo al día.
+    Estado_Club sigue existiendo como dato informativo de pertenencia al
+    club, pero ya no decide a quién se actualiza.
+    """
     fecha_hoy = fecha_formato_club(hoy)
 
     cambios_elo = []      # (nombre, elo_anterior, elo_nuevo)
     nuevos_records = []   # (nombre, max_anterior, max_nuevo)
-    no_encontrados = []   # (fide_id, nombre) -> activos sin rating en el listado
-    activos_revisados = 0
-    saltados_no_activos = 0
+    no_encontrados = []   # (fide_id, nombre) -> sin rating en el listado
+    jugadores_revisados = 0
 
     for fila in filas:
         # Asegura que la columna del mes existe en todas las filas, aunque
-        # sea la primera vez que se usa (jugadores Baja se quedan en blanco).
+        # sea la primera vez que se usa.
         fila.setdefault(col_mes_actual, "")
 
-        estado = normaliza(fila.get("Estado_Club", ""))
-        if estado not in ESTADOS_ACTIVOS:
-            saltados_no_activos += 1
-            continue
-
-        activos_revisados += 1
+        jugadores_revisados += 1
         fide_id = (fila.get("ID_FIDE") or "").strip()
         nuevo_elo = ratings.get(fide_id)
 
@@ -278,8 +276,7 @@ def actualizar_filas(
             nuevos_records.append((fila["Nombre"], max_previo, nuevo_elo))
 
     return {
-        "activos_revisados": activos_revisados,
-        "saltados_no_activos": saltados_no_activos,
+        "jugadores_revisados": jugadores_revisados,
         "cambios_elo": cambios_elo,
         "nuevos_records": nuevos_records,
         "no_encontrados": no_encontrados,
@@ -289,22 +286,17 @@ def actualizar_filas(
 def tomar_snapshot_actual(filas: list[dict[str, str]], col_mes_actual: str) -> dict:
     """
     Copia el valor que YA HAY en Elo_Actual a la columna histórica del mes,
-    para los jugadores activos, sin descargar nada de la FIDE.
+    para TODOS los jugadores (Alta y Baja incluidos), sin descargar nada
+    de la FIDE.
 
     Útil una única vez para no perder el dato actual justo antes de que la
     siguiente ejecución normal lo sobrescriba con el rating nuevo.
     """
-    capturados = []       # (nombre, elo)
-    vacios = []            # activos sin Elo_Actual con el que hacer snapshot
-    saltados_no_activos = 0
+    capturados = []    # (nombre, elo)
+    vacios = []         # jugadores sin Elo_Actual con el que hacer snapshot
 
     for fila in filas:
         fila.setdefault(col_mes_actual, "")
-
-        estado = normaliza(fila.get("Estado_Club", ""))
-        if estado not in ESTADOS_ACTIVOS:
-            saltados_no_activos += 1
-            continue
 
         elo_actual = (fila.get("Elo_Actual") or "").strip()
         if elo_actual:
@@ -316,16 +308,14 @@ def tomar_snapshot_actual(filas: list[dict[str, str]], col_mes_actual: str) -> d
     return {
         "capturados": capturados,
         "vacios": vacios,
-        "saltados_no_activos": saltados_no_activos,
     }
 
 
 def generar_resumen_snapshot(r: dict, col_mes_actual: str) -> str:
     L = [f"## Snapshot manual — columna {col_mes_actual}", ""]
     L.append(f"- Jugadores capturados desde Elo_Actual: **{len(r['capturados'])}**")
-    L.append(f"- Jugadores no activos (Baja) omitidos: {r['saltados_no_activos']}")
     if r["vacios"]:
-        L.append(f"- Activos sin Elo_Actual (no se ha podido capturar nada): {len(r['vacios'])}")
+        L.append(f"- Sin Elo_Actual (no se ha podido capturar nada): {len(r['vacios'])}")
     L.append("")
     return "\n".join(L)
 
@@ -333,11 +323,10 @@ def generar_resumen_snapshot(r: dict, col_mes_actual: str) -> str:
 def generar_resumen(r: dict, fecha_hoy: str, col_mes_actual: str) -> str:
     L = [f"## Actualización ranking FIDE — {fecha_hoy}", ""]
     L.append(f"- Columna histórica de este mes: **{col_mes_actual}**")
-    L.append(f"- Jugadores activos/alta revisados: **{r['activos_revisados']}**")
-    L.append(f"- Jugadores no activos (Baja) omitidos: {r['saltados_no_activos']}")
+    L.append(f"- Jugadores revisados (Alta y Baja incluidos): **{r['jugadores_revisados']}**")
     L.append(f"- Elo actualizado: **{len(r['cambios_elo'])}**")
     L.append(f"- Nuevos récords históricos (Max_Elo): **{len(r['nuevos_records'])}**")
-    L.append(f"- Activos sin rating encontrado en el listado FIDE: {len(r['no_encontrados'])}")
+    L.append(f"- Sin rating encontrado en el listado FIDE: {len(r['no_encontrados'])}")
     L.append("")
 
     if r["nuevos_records"]:
@@ -354,7 +343,7 @@ def generar_resumen(r: dict, fecha_hoy: str, col_mes_actual: str) -> str:
         L.append("")
 
     if r["no_encontrados"]:
-        L.append("### ⚠️ Activos sin rating en el listado FIDE (revisar ID_FIDE)")
+        L.append("### ⚠️ Sin rating en el listado FIDE (revisar ID_FIDE)")
         for fide_id, nombre in r["no_encontrados"]:
             L.append(f"- {nombre} (ID_FIDE={fide_id})")
         L.append("")
