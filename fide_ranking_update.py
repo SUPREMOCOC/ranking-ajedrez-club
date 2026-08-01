@@ -36,7 +36,15 @@ import requests
 # Si algún mes deja de funcionar, entra en https://ratings.fide.com/download_lists.phtml,
 # copia el enlace "XML format" de la lista combinada y pégalo aquí (o pásalo
 # con --fide-url).
-FIDE_XML_URL = "https://ratings.fide.com/download/players_list_xml.zip"
+# URL del listado de Elo estándar/clásico de la FIDE en XML. Usamos el
+# listado "solo estándar" (no el combinado con rápidas y blitz) porque es
+# lo único que necesitamos y pesa mucho menos (~13 MB en vez de ~47 MB):
+# más rápido de descargar automáticamente, y más cómodo si algún mes lo
+# descargas tú a mano (ver --archivo-local más abajo).
+# Si algún mes deja de funcionar, entra en https://ratings.fide.com/download_lists.phtml,
+# copia el enlace "XML format" de la fila STANDARD y pégalo aquí (o pásalo
+# con --fide-url).
+FIDE_XML_URL = "https://ratings.fide.com/download/standard_rating_list_xml.zip"
 FIDE_DOWNLOAD_PAGE = "https://ratings.fide.com/download_lists.phtml"
 
 CSV_DELIMITER = ";"
@@ -144,6 +152,29 @@ def descargar_xml_fide(url: str = FIDE_XML_URL, intentos: int = 3) -> bytes:
         f"No se pudo descargar un listado FIDE válido tras {intentos} intentos. "
         f"Último error: {ultimo_error}"
     )
+
+
+def leer_xml_local(ruta: Path) -> bytes:
+    """
+    Lee el XML de la FIDE desde un fichero ya descargado a mano (.zip o
+    .xml sueltos), sin contactar con la FIDE. Acepta cualquiera de los
+    ficheros que ofrece https://ratings.fide.com/download_lists.phtml
+    (combinado, solo estándar, legacy...): busca el primer <player> con
+    <fideid> y <rating> dentro.
+    """
+    if not ruta.exists():
+        raise FileNotFoundError(f"No se encuentra el fichero: {ruta}")
+
+    if ruta.suffix.lower() == ".zip":
+        with zipfile.ZipFile(ruta) as zf:
+            xml_names = [n for n in zf.namelist() if n.lower().endswith(".xml")]
+            if not xml_names:
+                raise RuntimeError(f"El zip {ruta} no contiene ningún .xml")
+            return zf.read(xml_names[0])
+    elif ruta.suffix.lower() == ".xml":
+        return ruta.read_bytes()
+    else:
+        raise ValueError(f"Extensión no soportada en {ruta}: se esperaba .zip o .xml")
 
 
 def parsear_ratings(xml_bytes: bytes) -> dict[str, int]:
@@ -352,6 +383,12 @@ def main() -> None:
                              "Útil una sola vez para no perder el dato actual antes de la "
                              "primera actualización automática con histórico."
                          ))
+    parser.add_argument("--archivo-local", type=Path, default=None,
+                         help=(
+                             "Ruta a un .zip o .xml de la FIDE ya descargado a mano "
+                             "(p. ej. subido por el usuario a fide_data/). Si se indica, "
+                             "no se descarga nada de la FIDE."
+                         ))
     args = parser.parse_args()
 
     if not args.csv.exists():
@@ -374,16 +411,23 @@ def main() -> None:
             print(f"CSV actualizado: {args.csv}")
         return
 
-    print(f"Descargando listado FIDE desde: {args.fide_url}")
-    try:
-        xml_bytes = descargar_xml_fide(args.fide_url)
-    except Exception as e:
-        sys.exit(
-            "ERROR descargando/leyendo el listado FIDE.\n"
-            f"Detalle: {e}\n"
-            f"Comprueba manualmente en {FIDE_DOWNLOAD_PAGE} si la URL de descarga "
-            "ha cambiado y actualiza FIDE_XML_URL en el script si es necesario."
-        )
+    if args.archivo_local:
+        print(f"Leyendo listado FIDE desde fichero local: {args.archivo_local}")
+        try:
+            xml_bytes = leer_xml_local(args.archivo_local)
+        except Exception as e:
+            sys.exit(f"ERROR leyendo el fichero local {args.archivo_local}: {e}")
+    else:
+        print(f"Descargando listado FIDE desde: {args.fide_url}")
+        try:
+            xml_bytes = descargar_xml_fide(args.fide_url)
+        except Exception as e:
+            sys.exit(
+                "ERROR descargando/leyendo el listado FIDE.\n"
+                f"Detalle: {e}\n"
+                f"Comprueba manualmente en {FIDE_DOWNLOAD_PAGE} si la URL de descarga "
+                "ha cambiado y actualiza FIDE_XML_URL en el script si es necesario."
+            )
 
     ratings = parsear_ratings(xml_bytes)
     print(f"Listado FIDE parseado correctamente: {len(ratings)} jugadores con rating estándar vigente.")
