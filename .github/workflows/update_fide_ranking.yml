@@ -6,10 +6,15 @@ on:
     # día 1, pero esos primeros días recibe mucho tráfico y a veces da
     # timeouts — esperamos más margen para evitar la hora punta.
     - cron: '0 6 10 * *'
+  push:
+    # Se dispara solo con subir un .zip/.xml de la FIDE a esta carpeta
+    # (arrastrar y soltar en GitHub vale). No hace falta lanzarlo a mano.
+    paths:
+      - 'fide_data/**'
   workflow_dispatch:
     inputs:
       modo:
-        description: 'Modo de ejecución'
+        description: 'Modo de ejecución (se ignora si hay un fichero en fide_data/)'
         required: true
         default: 'actualizar_fide'
         type: choice
@@ -35,37 +40,68 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
+      - name: Detectar modo de ejecución
+        id: detectar
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            ARCHIVO=$(find fide_data -maxdepth 1 -type f \( -iname '*.zip' -o -iname '*.xml' \) | head -n1)
+            if [ -z "$ARCHIVO" ]; then
+              echo "Push en fide_data/ pero sin ningún .zip/.xml dentro (¿solo se ha borrado algo?). No hay nada que hacer."
+              echo "modo=nada" >> "$GITHUB_OUTPUT"
+            else
+              echo "Fichero detectado en fide_data/: $ARCHIVO"
+              echo "modo=archivo_local" >> "$GITHUB_OUTPUT"
+              echo "archivo=$ARCHIVO" >> "$GITHUB_OUTPUT"
+            fi
+          elif [ "${{ github.event.inputs.modo }}" = "snapshot_actual" ]; then
+            echo "modo=snapshot_actual" >> "$GITHUB_OUTPUT"
+          else
+            echo "modo=actualizar_fide" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Diagnóstico de conectividad con la FIDE
-        if: github.event.inputs.modo != 'snapshot_actual'
+        if: steps.detectar.outputs.modo == 'actualizar_fide'
         continue-on-error: true
         run: |
           echo "--- curl -I (solo cabeceras) ---"
-          curl -I --max-time 30 -A "Mozilla/5.0" https://ratings.fide.com/download/players_list_xml.zip || true
-          echo "--- ping (puede estar bloqueado igualmente, es informativo) ---"
+          curl -I --max-time 30 -A "Mozilla/5.0" https://ratings.fide.com/download/standard_rating_list_xml.zip || true
+          echo "--- comprobación general de la web ---"
           curl -sS --max-time 15 -o /dev/null -w "HTTP %{http_code}, tiempo total %{time_total}s\n" https://ratings.fide.com/ || true
 
       - name: Ejecutar actualización del ranking
+        if: steps.detectar.outputs.modo != 'nada'
         run: |
-          MODO="${{ github.event.inputs.modo }}"
-          if [ "$MODO" = "snapshot_actual" ]; then
-            echo "Modo snapshot: copiando Elo_Actual a la columna del mes, sin contactar con la FIDE."
-            python fide_ranking_update.py --csv jugadores_club.csv --snapshot-actual
-          else
-            python fide_ranking_update.py --csv jugadores_club.csv
-          fi
+          case "${{ steps.detectar.outputs.modo }}" in
+            snapshot_actual)
+              echo "Modo snapshot: copiando Elo_Actual a la columna del mes, sin contactar con la FIDE."
+              python fide_ranking_update.py --csv jugadores_club.csv --snapshot-actual
+              ;;
+            archivo_local)
+              echo "Modo archivo local: usando el fichero subido a fide_data/, sin contactar con la FIDE."
+              python fide_ranking_update.py --csv jugadores_club.csv --archivo-local "${{ steps.detectar.outputs.archivo }}"
+              ;;
+            *)
+              python fide_ranking_update.py --csv jugadores_club.csv
+              ;;
+          esac
+
+      - name: Borrar el fichero de fide_data/ ya procesado
+        if: steps.detectar.outputs.modo == 'archivo_local'
+        run: rm -f "${{ steps.detectar.outputs.archivo }}"
 
       - name: Añadir resumen a la ejecución
-        if: always()
+        if: always() && steps.detectar.outputs.modo != 'nada'
         run: |
           if [ -f update_summary.md ]; then
             cat update_summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Commit y push si hay cambios
+        if: steps.detectar.outputs.modo != 'nada'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add jugadores_club.csv
+          git add -A -- jugadores_club.csv fide_data
           if git diff --cached --quiet; then
             echo "Sin cambios en el ranking este mes."
           else
