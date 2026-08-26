@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import html
 
 # Configuración de la página web
 st.set_page_config(
@@ -147,6 +148,31 @@ if not df_base.empty:
         st.subheader("👑 El Salón de la Fama")
         df_hof = df_base.sort_values(by="Max_Elo", ascending=False).head(10).reset_index(drop=True)
         df_hof.index = df_hof.index + 1
+                # --- PODIO: Top 3 destacado en tarjetas propias ---
+        podio = df_hof.head(3)
+        if not podio.empty:
+            medallas = ["🥇", "🥈", "🥉"]
+            colores_fondo = ["#fff7e6", "#f1f5f9", "#fdf1e7"]
+            colores_borde = ["#d97706", "#94a3b8", "#c2703c"]
+
+            cols_podio = st.columns(len(podio))
+            for i, (_, fila) in enumerate(podio.iterrows()):
+                estado = str(fila.get("Estado_Club", "")).strip().lower()
+                etiqueta_estado = "🟢 Activo" if estado in ("activo", "alta") else "⚪ Baja"
+                nombre_seguro = html.escape(str(fila.get("Nombre", "")))
+                fecha_record = fila.get("Fecha_Record", "") or "—"
+
+                with cols_podio[i]:
+                    st.markdown(f"""
+                        <div style="background-color:{colores_fondo[i]};border:2px solid {colores_borde[i]};
+                                    border-radius:16px;padding:20px 10px;text-align:center;">
+                            <div style="font-size:2.4rem;line-height:1;">{medallas[i]}</div>
+                            <div style="font-weight:700;font-size:1rem;margin-top:8px;min-height:2.4em;">{nombre_seguro}</div>
+                            <div style="font-size:1.9rem;font-weight:800;color:{colores_borde[i]};margin-top:4px;">{int(fila['Max_Elo'])}</div>
+                            <div style="font-size:0.78rem;color:#475569;margin-top:6px;">{fecha_record} · {etiqueta_estado}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+            st.write("")
         
         cols_deseadas_hof = ["Nombre", "ID_FIDE", "Max_Elo", "Fecha_Record", "Elo_Actual", "Estado_Club"]
         cols_reales_hof = [c for c in cols_deseadas_hof if c in df_hof.columns]
