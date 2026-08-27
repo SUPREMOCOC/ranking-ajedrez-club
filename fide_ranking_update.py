@@ -20,7 +20,7 @@ import sys
 import unicodedata
 import zipfile
 import xml.etree.ElementTree as ET
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
@@ -230,6 +230,7 @@ def actualizar_filas(
     ratings: dict[str, int],
     col_mes_actual: str,
     hoy: Optional[date] = None,
+    actualizar_elo_actual: bool = True,
 ) -> dict:
     """
     Actualiza el Elo de TODOS los jugadores del CSV que aparezcan en el
@@ -238,6 +239,12 @@ def actualizar_filas(
     jugando en otros clubes, y también queremos su Elo al día.
     Estado_Club sigue existiendo como dato informativo de pertenencia al
     club, pero ya no decide a quién se actualiza.
+
+    Si actualizar_elo_actual=False (modo backfill de un mes pasado), se
+    rellena la columna histórica de ese mes y se sigue comprobando el
+    récord (Max_Elo), pero NO se toca Elo_Actual — ese campo debe reflejar
+    siempre el dato más reciente, no uno antiguo que se esté rellenando
+    a posteriori.
     """
     fecha_hoy = fecha_formato_club(hoy)
 
@@ -266,7 +273,7 @@ def actualizar_filas(
         # hoy, aunque no haya cambiado respecto al mes anterior.
         fila[col_mes_actual] = str(nuevo_elo)
 
-        if nuevo_elo != elo_previo:
+        if actualizar_elo_actual and nuevo_elo != elo_previo:
             cambios_elo.append((fila["Nombre"], elo_previo, nuevo_elo))
             fila["Elo_Actual"] = str(nuevo_elo)
 
@@ -320,9 +327,12 @@ def generar_resumen_snapshot(r: dict, col_mes_actual: str) -> str:
     return "\n".join(L)
 
 
-def generar_resumen(r: dict, fecha_hoy: str, col_mes_actual: str) -> str:
+def generar_resumen(r: dict, fecha_hoy: str, col_mes_actual: str, actualizar_elo_actual: bool = True) -> str:
     L = [f"## Actualización ranking FIDE — {fecha_hoy}", ""]
     L.append(f"- Columna histórica de este mes: **{col_mes_actual}**")
+    if not actualizar_elo_actual:
+        L.append("- ⏪ Modo backfill: solo se rellena esta columna histórica (y Max_Elo si aplica). "
+                  "Elo_Actual **no** se ha tocado.")
     L.append(f"- Jugadores revisados (Alta y Baja incluidos): **{r['jugadores_revisados']}**")
     L.append(f"- Elo actualizado: **{len(r['cambios_elo'])}**")
     L.append(f"- Nuevos récords históricos (Max_Elo): **{len(r['nuevos_records'])}**")
@@ -378,10 +388,28 @@ def main() -> None:
                              "(p. ej. subido por el usuario a fide_data/). Si se indica, "
                              "no se descarga nada de la FIDE."
                          ))
+    parser.add_argument("--mes", default=None, metavar="AAAA-MM",
+                         help=(
+                             "Para rellenar el histórico de un mes PASADO (backfill) con un "
+                             "listado archivado de la FIDE, en vez de usar el mes actual. "
+                             "Formato AAAA-MM, p. ej. --mes 2024-11. En este modo NO se toca "
+                             "Elo_Actual (solo la columna histórica de ese mes y, si aplica, "
+                             "Max_Elo/Fecha_Record)."
+                         ))
     args = parser.parse_args()
 
     if not args.csv.exists():
         sys.exit(f"ERROR: no se encuentra el CSV: {args.csv}")
+
+    if args.mes:
+        try:
+            fecha_referencia = datetime.strptime(args.mes, "%Y-%m").date()
+        except ValueError:
+            sys.exit(f"ERROR: --mes debe tener formato AAAA-MM (ej. 2024-11), recibido: {args.mes!r}")
+        modo_backfill = True
+    else:
+        fecha_referencia = date.today()
+        modo_backfill = False
 
     if args.snapshot_actual:
         filas, fieldnames_existentes = leer_csv(args.csv)
@@ -422,12 +450,22 @@ def main() -> None:
     print(f"Listado FIDE parseado correctamente: {len(ratings)} jugadores con rating estándar vigente.")
 
     filas, fieldnames_existentes = leer_csv(args.csv)
-    col_mes_actual = columna_mes_actual()
+    col_mes_actual = columna_mes_actual(fecha_referencia)
     fieldnames_finales = ordenar_columnas(fieldnames_existentes, col_mes_actual)
 
-    resultado = actualizar_filas(filas, ratings, col_mes_actual)
+    if modo_backfill:
+        print(f"Modo backfill: rellenando {col_mes_actual} sin tocar Elo_Actual.")
 
-    resumen = generar_resumen(resultado, fecha_formato_club(), col_mes_actual)
+    resultado = actualizar_filas(
+        filas, ratings, col_mes_actual,
+        hoy=fecha_referencia,
+        actualizar_elo_actual=not modo_backfill,
+    )
+
+    resumen = generar_resumen(
+        resultado, fecha_formato_club(fecha_referencia), col_mes_actual,
+        actualizar_elo_actual=not modo_backfill,
+    )
     print("\n" + resumen)
     args.summary.write_text(resumen, encoding="utf-8")
 
