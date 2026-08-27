@@ -66,6 +66,38 @@ def etiqueta_estado(fila):
     return "🟢 Activo" if estado in ("activo", "alta") else "⚪ Baja"
 
 
+MESES_ES_ABR = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+MESES_ES_COMPLETO = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+
+def _partes_columna_mes(nombre_columna):
+    """'Elo_2026-08' -> (2026, 8). None si el nombre no tiene ese formato."""
+    try:
+        y, m = nombre_columna.replace("Elo_", "").split("-")
+        return int(y), int(m)
+    except (ValueError, IndexError):
+        return None
+
+
+def columna_a_fecha_record(nombre_columna):
+    """'Elo_2026-08' -> 'ago-26' (mismo formato que usa la columna Fecha_Record)."""
+    partes = _partes_columna_mes(nombre_columna)
+    if not partes:
+        return None
+    y, m = partes
+    return f"{MESES_ES_ABR[m - 1]}-{str(y)[-2:]}"
+
+
+def mes_legible(nombre_columna):
+    """'Elo_2026-08' -> 'Agosto 2026'."""
+    partes = _partes_columna_mes(nombre_columna)
+    if not partes:
+        return nombre_columna
+    y, m = partes
+    return f"{MESES_ES_COMPLETO[m - 1]} {y}"
+
+
 def mostrar_podio(df_top3, columna_valor, formatear_subtitulo):
     """Tarjetas oro/plata/bronce para las primeras filas de df_top3 (hasta 3)."""
     if df_top3.empty:
@@ -99,6 +131,11 @@ dict_nombres_tablas = {
 df_base = cargar_datos_completos()
 
 if not df_base.empty:
+    # Columnas de histórico mensual (Elo_AAAA-MM), en el orden en que ya vienen en el CSV
+    # (cronológico, de más antiguo a más reciente). Se usa en varias pestañas.
+    COLUMNAS_FIJAS = ["Nombre", "ID_FIDE", "Estado_Club", "Elo_Actual", "Max_Elo", "Fecha_Record"]
+    columnas_meses = [col for col in df_base.columns if col not in COLUMNAS_FIJAS and "Unnamed" not in col]
+
     tab_activos, tab_general, tab_hof, tab_evolucion = st.tabs([
         "🏃 Jugadores Activos",
         "👥 Club Completo (Todos)",
@@ -123,6 +160,45 @@ if not df_base.empty:
         c1.metric("Activos", total_activos)
         c2.metric("Elo Top Activo", elo_top)
         c3.metric("Media Elo Activos", media_activos)
+
+        # --- Destacados del mes: mayores subidas y nuevos récords ---
+        st.markdown("#### 🔥 Destacados del mes")
+        if len(columnas_meses) < 2:
+            st.info("Todavía no hay dos meses de histórico para calcular subidas mensuales.")
+        else:
+            col_mes_actual_hist = columnas_meses[-1]
+            col_mes_anterior_hist = columnas_meses[-2]
+
+            df_subidas = df_activos.copy()
+            df_subidas["_actual"] = pd.to_numeric(df_subidas[col_mes_actual_hist], errors="coerce")
+            df_subidas["_anterior"] = pd.to_numeric(df_subidas[col_mes_anterior_hist], errors="coerce")
+            df_subidas = df_subidas.dropna(subset=["_actual", "_anterior"])
+            df_subidas["_subida"] = df_subidas["_actual"] - df_subidas["_anterior"]
+            top_subidas = df_subidas[df_subidas["_subida"] > 0].sort_values("_subida", ascending=False).head(3)
+
+            fecha_este_mes = columna_a_fecha_record(col_mes_actual_hist)
+            nuevos_records = pd.DataFrame()
+            if fecha_este_mes:
+                nuevos_records = df_activos[
+                    df_activos["Fecha_Record"].astype(str).str.strip().str.lower() == fecha_este_mes.lower()
+                ]
+
+            col_subidas, col_records = st.columns(2)
+            with col_subidas:
+                st.markdown(f"**📈 Mayores subidas — {mes_legible(col_mes_actual_hist)}**")
+                if top_subidas.empty:
+                    st.caption("Nadie ha subido de Elo este mes.")
+                else:
+                    for _, fila in top_subidas.iterrows():
+                        st.write(f"**{fila['Nombre']}** +{int(fila['_subida'])} ({int(fila['_anterior'])} → {int(fila['_actual'])})")
+
+            with col_records:
+                st.markdown(f"**🏆 Nuevos récords — {mes_legible(col_mes_actual_hist)}**")
+                if nuevos_records.empty:
+                    st.caption("Sin nuevos récords este mes.")
+                else:
+                    for _, fila in nuevos_records.iterrows():
+                        st.write(f"**{fila['Nombre']}** — {int(fila['Max_Elo'])}")
 
         mostrar_podio(
             df_activos.head(3), "Elo_Actual",
@@ -229,9 +305,6 @@ if not df_base.empty:
     # =========================================================
     with tab_evolucion:
         st.subheader("📈 Evolución Histórica de Elo")
-
-        columnas_fijas = ["Nombre", "ID_FIDE", "Estado_Club", "Elo_Actual", "Max_Elo", "Fecha_Record"]
-        columnas_meses = [col for col in df_base.columns if col not in columnas_fijas and "Unnamed" not in col]
 
         if len(columnas_meses) == 0:
             st.info("Aún no se han detectado columnas de meses en el archivo.")
