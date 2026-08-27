@@ -421,7 +421,7 @@ if not df_base.empty:
                     </iframe>
                 </div>
                 """,
-                height=450
+                height=850
             )
 
 else:
