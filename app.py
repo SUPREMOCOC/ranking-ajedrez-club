@@ -401,28 +401,26 @@ if not df_base.empty:
                         st.info(f"💡 **{jugador}** no tiene registros mensuales suficientes para calcular rendimientos.")
                         st.divider()
 
-    # =========================================================
-    # PESTAÑA 5: LICHESS TV 
+# =========================================================
+    # PESTAÑA 5: LICHESS TV (VERSIÓN MÁS GRANDE)
     # =========================================================
     with tab_tv:
         st.subheader("📺 Retransmisión en Directo (Lichess TV)")
         st.caption("Sigue en vivo la partida con mayor nivel de elo que se está jugando en este momento.")
 
-        # Centramos el marco flotante usando 3 columnas
-        col_espacio1, col_tv, col_espacio2 = st.columns([1, 2, 1])
-        with col_tv:
-            components.html(
-                """
-                <div style="display: flex; justify-content: center;">
-                    <iframe src="https://lichess.org/tv/rapid/frame?theme=brown&bg=dark" 
-                            style="width: 800px; height: 880px;" 
-                            allowtransparency="true" 
-                            frameborder="0">
-                    </iframe>
-                </div>
-                """,
-                height=850
-            )
+        # Centrado y ajustado a un tamaño más amplio (600px de ancho)
+        components.html(
+            """
+            <div style="display: flex; justify-content: center;">
+                <iframe src="https://lichess.org/tv/frame?theme=brown&bg=dark" 
+                        style="width: 100%; max-width: 600px; height: 660px;" 
+                        allowtransparency="true" 
+                        frameborder="0">
+                </iframe>
+            </div>
+            """,
+            height=680  # Altura del contenedor en Streamlit
+        )
 
 else:
     st.warning("Aún no hay datos de jugadores disponibles.")
