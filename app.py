@@ -414,8 +414,8 @@ if not df_base.empty:
             components.html(
                 """
                 <div style="display: flex; justify-content: center;">
-                    <iframe src="https://lichess.org/tv/frame?theme=brown&bg=dark" 
-                            style="width: 400px; height: 440px;" 
+                    <iframe src="https://lichess.org/tv/rapid/frame?theme=brown&bg=dark" 
+                            style="width: 800px; height: 880px;" 
                             allowtransparency="true" 
                             frameborder="0">
                     </iframe>
