@@ -1,6 +1,7 @@
 import html
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 
@@ -132,15 +133,16 @@ df_base = cargar_datos_completos()
 
 if not df_base.empty:
     # Columnas de histórico mensual (Elo_AAAA-MM), en el orden en que ya vienen en el CSV
-    # (cronológico, de más antiguo a más reciente). Se usa en varias pestañas.
     COLUMNAS_FIJAS = ["Nombre", "ID_FIDE", "Estado_Club", "Elo_Actual", "Max_Elo", "Fecha_Record"]
     columnas_meses = [col for col in df_base.columns if col not in COLUMNAS_FIJAS and "Unnamed" not in col]
 
-    tab_activos, tab_general, tab_hof, tab_evolucion = st.tabs([
+    # SE AÑADE LA NUEVA PESTAÑA A LA LISTA
+    tab_activos, tab_general, tab_hof, tab_evolucion, tab_tv = st.tabs([
         "🏃 Jugadores Activos",
         "👥 Club Completo (Todos)",
         "👑 Hall of Fame",
-        "📈 Evolución Elo"
+        "📈 Evolución Elo",
+        "📺 Lichess TV"
     ])
 
     # =========================================================
@@ -334,12 +336,11 @@ if not df_base.empty:
                     st.plotly_chart(fig_line, use_container_width=True)
 
                 # -----------------------------------------------------------------
-                # ANÁLISIS DE RENDIMIENTO (Último mes, Último año, Rango Personalizado, Pico)
+                # ANÁLISIS DE RENDIMIENTO
                 # -----------------------------------------------------------------
                 st.markdown("---")
                 st.markdown("### 📊 Análisis de Rendimiento Detallado")
 
-                # Selectores para el rango personalizado
                 st.write("Selecciona un período de tiempo personalizado:")
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
@@ -362,12 +363,10 @@ if not df_base.empty:
                         if len(df_jug) >= 2:
                             elo_prev_mes = int(df_jug["Elo"].iloc[-2])
                             dif_mes = elo_actual - elo_prev_mes
-                            label_mes = f"Mes Ant. ({df_jug['Mes'].iloc[-2]})"
                         else:
                             dif_mes = 0
-                            label_mes = "Mes Anterior"
 
-                        # 2. Variación del Último Año (12 meses atrás o inicio)
+                        # 2. Variación del Último Año
                         if len(df_jug) >= 13:
                             elo_prev_ano = int(df_jug["Elo"].iloc[-13])
                             label_ano = f"Hace 1 Año ({df_jug['Mes'].iloc[-13]})"
@@ -380,7 +379,6 @@ if not df_base.empty:
                             dif_ano = 0
                             label_ano = "Último Año"
 
-                        # Primera fila de métricas: Último Mes, Último Año, Pico
                         col1, col2, col3 = st.columns(3)
                         col1.metric(label="🗓️ Último Mes", value=elo_actual, delta=f"{dif_mes:+d} pts")
                         col2.metric(label=f"📅 {label_ano}", value=elo_actual, delta=f"{dif_ano:+d} pts")
@@ -388,7 +386,7 @@ if not df_base.empty:
                         distancia_pico = elo_actual - pico_max
                         col3.metric(label="👑 Pico de Elo", value=pico_max, delta=f"{distancia_pico} al récord" if distancia_pico < 0 else "¡En su Récord!")
 
-                        # Segunda fila: Rango personalizado seleccionado con los desplegables
+                        # Rango personalizado
                         val_inicio = df_jug[df_jug["Mes"] == mes_inicio_sel]["Elo"]
                         val_fin = df_jug[df_jug["Mes"] == mes_fin_sel]["Elo"]
 
@@ -402,6 +400,29 @@ if not df_base.empty:
                     else:
                         st.info(f"💡 **{jugador}** no tiene registros mensuales suficientes para calcular rendimientos.")
                         st.divider()
+
+    # =========================================================
+    # PESTAÑA 5: LICHESS TV 
+    # =========================================================
+    with tab_tv:
+        st.subheader("📺 Retransmisión en Directo (Lichess TV)")
+        st.caption("Sigue en vivo la partida con mayor nivel de elo que se está jugando en este momento.")
+
+        # Centramos el marco flotante usando 3 columnas
+        col_espacio1, col_tv, col_espacio2 = st.columns([1, 2, 1])
+        with col_tv:
+            components.html(
+                """
+                <div style="display: flex; justify-content: center;">
+                    <iframe src="https://lichess.org/tv/frame?theme=brown&bg=dark" 
+                            style="width: 400px; height: 440px;" 
+                            allowtransparency="true" 
+                            frameborder="0">
+                    </iframe>
+                </div>
+                """,
+                height=450
+            )
 
 else:
     st.warning("Aún no hay datos de jugadores disponibles.")
