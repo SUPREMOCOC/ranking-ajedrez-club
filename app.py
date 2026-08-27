@@ -402,24 +402,24 @@ if not df_base.empty:
                         st.divider()
 
 # =========================================================
-    # PESTAÑA 5: LICHESS TV (VERSIÓN MÁS GRANDE)
+    # PESTAÑA 5: TV DIRECTO
     # =========================================================
     with tab_tv:
         st.subheader("📺 Retransmisión en Directo (Lichess TV)")
-        st.caption("Sigue en vivo la partida con mayor nivel de elo que se está jugando en este momento.")
+        st.caption("Por cortesía de Lichess disfruta de una partida de alto nivel en directo")
 
-        # Centrado y ajustado a un tamaño más amplio (600px de ancho)
+
         components.html(
             """
             <div style="display: flex; justify-content: center;">
-                <iframe src="https://lichess.org/tv/frame?theme=brown&bg=dark" 
+                <iframe src="https://lichess.org/tv/rapid/frame?theme=brown&bg=dark" 
                         style="width: 100%; max-width: 600px; height: 660px;" 
                         allowtransparency="true" 
                         frameborder="0">
                 </iframe>
             </div>
             """,
-            height=680  # Altura del contenedor en Streamlit
+            height=680  
         )
 
 else:
