@@ -7,14 +7,15 @@ on:
     # timeouts — esperamos más margen para evitar la hora punta.
     - cron: '0 6 10 * *'
   push:
-    # Se dispara solo con subir un .zip/.xml de la FIDE a esta carpeta
-    # (arrastrar y soltar en GitHub vale). No hace falta lanzarlo a mano.
+    # Se dispara solo con subir .zip/.xml a esta carpeta (arrastrar y
+    # soltar en GitHub vale, y puedes subir varios de golpe). No hace
+    # falta lanzarlo a mano.
     paths:
       - 'fide_data/**'
   workflow_dispatch:
     inputs:
       modo:
-        description: 'Modo de ejecución (se ignora si hay un fichero en fide_data/)'
+        description: 'Modo de ejecución (se ignora si hay ficheros en fide_data/)'
         required: true
         default: 'actualizar_fide'
         type: choice
@@ -44,14 +45,13 @@ jobs:
         id: detectar
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            ARCHIVO=$(find fide_data -maxdepth 1 -type f \( -iname '*.zip' -o -iname '*.xml' \) | head -n1)
-            if [ -z "$ARCHIVO" ]; then
+            N=$(find fide_data -maxdepth 1 -type f \( -iname '*.zip' -o -iname '*.xml' \) | wc -l)
+            if [ "$N" -eq 0 ]; then
               echo "Push en fide_data/ pero sin ningún .zip/.xml dentro (¿solo se ha borrado algo?). No hay nada que hacer."
               echo "modo=nada" >> "$GITHUB_OUTPUT"
             else
-              echo "Fichero detectado en fide_data/: $ARCHIVO"
+              echo "$N fichero(s) detectado(s) en fide_data/"
               echo "modo=archivo_local" >> "$GITHUB_OUTPUT"
-              echo "archivo=$ARCHIVO" >> "$GITHUB_OUTPUT"
             fi
           elif [ "${{ github.event.inputs.modo }}" = "snapshot_actual" ]; then
             echo "modo=snapshot_actual" >> "$GITHUB_OUTPUT"
@@ -72,22 +72,58 @@ jobs:
         if: steps.detectar.outputs.modo != 'nada'
         run: |
           case "${{ steps.detectar.outputs.modo }}" in
+
             snapshot_actual)
               echo "Modo snapshot: copiando Elo_Actual a la columna del mes, sin contactar con la FIDE."
               python fide_ranking_update.py --csv jugadores_club.csv --snapshot-actual
               ;;
+
             archivo_local)
-              echo "Modo archivo local: usando el fichero subido a fide_data/, sin contactar con la FIDE."
-              python fide_ranking_update.py --csv jugadores_club.csv --archivo-local "${{ steps.detectar.outputs.archivo }}"
+              # Procesa TODOS los ficheros de fide_data/, en orden
+              # CRONOLÓGICO según el AAAA-MM que lleven en el nombre
+              # (importante: Max_Elo necesita procesar los meses en orden
+              # para llevar bien la cuenta del récord). El orden no
+              # depende del nombre completo del fichero, así que da igual
+              # que le añadas un prefijo (p. ej. "estandar_2024-02.zip").
+              #
+              # Si el nombre del fichero contiene un AAAA-MM, se trata como
+              # backfill de ESE mes concreto (no toca Elo_Actual). Si no
+              # lleva fecha en el nombre (el caso normal de cada mes,
+              # descargado tal cual de la FIDE), se procesa el último, con
+              # el mes actual, y sí actualiza Elo_Actual, como siempre.
+              echo "Modo archivo(s) local(es): usando lo subido a fide_data/, sin contactar con la FIDE."
+              > resumen_combinado.md
+              > orden.txt
+              for ARCHIVO in $(find fide_data -maxdepth 1 -type f \( -iname '*.zip' -o -iname '*.xml' \)); do
+                MES=$(basename "$ARCHIVO" | grep -oE '[0-9]{4}-(0[1-9]|1[0-2])' | head -n1 || true)
+                if [ -z "$MES" ]; then
+                  printf '9999-99\tSIN_MES\t%s\n' "$ARCHIVO" >> orden.txt
+                else
+                  printf '%s\t%s\t%s\n' "$MES" "$MES" "$ARCHIVO" >> orden.txt
+                fi
+              done
+
+              while IFS=$(printf '\t') read -r CLAVE MES ARCHIVO; do
+                if [ "$MES" != "SIN_MES" ]; then
+                  echo "→ $ARCHIVO → backfill del mes $MES (no toca Elo_Actual)"
+                  python fide_ranking_update.py --csv jugadores_club.csv --archivo-local "$ARCHIVO" --mes "$MES"
+                else
+                  echo "→ $ARCHIVO → mes actual (actualiza Elo_Actual)"
+                  python fide_ranking_update.py --csv jugadores_club.csv --archivo-local "$ARCHIVO"
+                fi
+                echo "" >> resumen_combinado.md
+                cat update_summary.md >> resumen_combinado.md
+                rm -f "$ARCHIVO"
+              done < <(sort orden.txt)
+
+              rm -f orden.txt
+              mv resumen_combinado.md update_summary.md
               ;;
+
             *)
               python fide_ranking_update.py --csv jugadores_club.csv
               ;;
           esac
-
-      - name: Borrar el fichero de fide_data/ ya procesado
-        if: steps.detectar.outputs.modo == 'archivo_local'
-        run: rm -f "${{ steps.detectar.outputs.archivo }}"
 
       - name: Añadir resumen a la ejecución
         if: always() && steps.detectar.outputs.modo != 'nada'
@@ -108,3 +144,4 @@ jobs:
             git commit -m "Actualización automática ranking FIDE $(date +'%Y-%m')"
             git push
           fi
+
