@@ -99,6 +99,64 @@ def mes_legible(nombre_columna):
     return f"{MESES_ES_COMPLETO[m - 1]} {y}"
 
 
+def mes_a_temporada(y: int, m: int) -> str:
+    """
+    Temporada del club: de septiembre (año Y) a agosto (año Y+1) incluido.
+    Septiembre ya cuenta como el inicio de la temporada nueva.
+    """
+    if m >= 9:
+        return f"{y}-{y + 1}"
+    return f"{y - 1}-{y}"
+
+
+def columnas_por_temporada(columnas_meses: list[str]) -> dict[str, list[str]]:
+    """
+    Agrupa las columnas Elo_AAAA-MM en {temporada: [columnas ordenadas
+    cronológicamente]}. Las temporadas salen ordenadas de más antigua a
+    más reciente.
+    """
+    grupos: dict[str, list[str]] = {}
+    for col in columnas_meses:
+        partes = _partes_columna_mes(col)
+        if not partes:
+            continue
+        y, m = partes
+        temporada = mes_a_temporada(y, m)
+        grupos.setdefault(temporada, []).append(col)
+    for t in grupos:
+        grupos[t].sort(key=lambda c: _partes_columna_mes(c))
+    return dict(sorted(grupos.items()))
+
+
+def stats_temporada_jugador(fila, columnas_temporada: list[str]):
+    """
+    Elo al primer y último dato disponibles del jugador dentro de esa
+    temporada (sin asumir que existe un mes concreto: si alguien se
+    apuntó a mitad de temporada, su "inicio" es su primer dato real).
+    Devuelve None si no hay ningún dato de esa persona en la temporada.
+    """
+    valores = []
+    for col in columnas_temporada:
+        v = fila.get(col, "")
+        if v not in (None, ""):
+            try:
+                valores.append((col, int(float(v))))
+            except (TypeError, ValueError):
+                pass
+    if not valores:
+        return None
+    col_inicio, elo_inicio = valores[0]
+    col_fin, elo_fin = valores[-1]
+    return {
+        "Elo Inicio": elo_inicio,
+        "Mes Inicio": mes_legible(col_inicio),
+        "Elo Fin": elo_fin,
+        "Mes Fin": mes_legible(col_fin),
+        "Diferencia": elo_fin - elo_inicio,
+        "Pico Temporada": max(v for _, v in valores),
+    }
+
+
 def mostrar_podio(df_top3, columna_valor, formatear_subtitulo):
     """Tarjetas oro/plata/bronce para las primeras filas de df_top3 (hasta 3)."""
     if df_top3.empty:
@@ -133,16 +191,17 @@ df_base = cargar_datos_completos()
 
 if not df_base.empty:
     # Columnas de histórico mensual (Elo_AAAA-MM), en el orden en que ya vienen en el CSV
+    # (cronológico, de más antiguo a más reciente). Se usa en varias pestañas.
     COLUMNAS_FIJAS = ["Nombre", "ID_FIDE", "Estado_Club", "Elo_Actual", "Max_Elo", "Fecha_Record"]
     columnas_meses = [col for col in df_base.columns if col not in COLUMNAS_FIJAS and "Unnamed" not in col]
 
-    # SE AÑADE LA NUEVA PESTAÑA A LA LISTA
-    tab_activos, tab_general, tab_hof, tab_evolucion, tab_tv = st.tabs([
+    tab_activos, tab_general, tab_hof, tab_evolucion, tab_temporadas, tab_tercera = st.tabs([
         "🏃 Jugadores Activos",
         "👥 Club Completo (Todos)",
         "👑 Hall of Fame",
         "📈 Evolución Elo",
-        "📺 Lichess TV"
+        "🗓️ Temporadas",
+        "🏅 Tercera de Madrid"
     ])
 
     # =========================================================
@@ -336,11 +395,12 @@ if not df_base.empty:
                     st.plotly_chart(fig_line, use_container_width=True)
 
                 # -----------------------------------------------------------------
-                # ANÁLISIS DE RENDIMIENTO
+                # ANÁLISIS DE RENDIMIENTO (Último mes, Último año, Rango Personalizado, Pico)
                 # -----------------------------------------------------------------
                 st.markdown("---")
                 st.markdown("### 📊 Análisis de Rendimiento Detallado")
 
+                # Selectores para el rango personalizado
                 st.write("Selecciona un período de tiempo personalizado:")
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
@@ -363,10 +423,12 @@ if not df_base.empty:
                         if len(df_jug) >= 2:
                             elo_prev_mes = int(df_jug["Elo"].iloc[-2])
                             dif_mes = elo_actual - elo_prev_mes
+                            label_mes = f"Mes Ant. ({df_jug['Mes'].iloc[-2]})"
                         else:
                             dif_mes = 0
+                            label_mes = "Mes Anterior"
 
-                        # 2. Variación del Último Año
+                        # 2. Variación del Último Año (12 meses atrás o inicio)
                         if len(df_jug) >= 13:
                             elo_prev_ano = int(df_jug["Elo"].iloc[-13])
                             label_ano = f"Hace 1 Año ({df_jug['Mes'].iloc[-13]})"
@@ -379,6 +441,7 @@ if not df_base.empty:
                             dif_ano = 0
                             label_ano = "Último Año"
 
+                        # Primera fila de métricas: Último Mes, Último Año, Pico
                         col1, col2, col3 = st.columns(3)
                         col1.metric(label="🗓️ Último Mes", value=elo_actual, delta=f"{dif_mes:+d} pts")
                         col2.metric(label=f"📅 {label_ano}", value=elo_actual, delta=f"{dif_ano:+d} pts")
@@ -386,7 +449,7 @@ if not df_base.empty:
                         distancia_pico = elo_actual - pico_max
                         col3.metric(label="👑 Pico de Elo", value=pico_max, delta=f"{distancia_pico} al récord" if distancia_pico < 0 else "¡En su Récord!")
 
-                        # Rango personalizado
+                        # Segunda fila: Rango personalizado seleccionado con los desplegables
                         val_inicio = df_jug[df_jug["Mes"] == mes_inicio_sel]["Elo"]
                         val_fin = df_jug[df_jug["Mes"] == mes_fin_sel]["Elo"]
 
@@ -401,26 +464,63 @@ if not df_base.empty:
                         st.info(f"💡 **{jugador}** no tiene registros mensuales suficientes para calcular rendimientos.")
                         st.divider()
 
-# =========================================================
-    # PESTAÑA 5: TV DIRECTO
     # =========================================================
-    with tab_tv:
-        st.subheader("📺 Retransmisión en Directo (Lichess TV)")
-        st.caption("Por cortesía de Lichess disfruta de una partida de alto nivel en directo")
+    # PESTAÑA 5: TEMPORADAS
+    # =========================================================
+    with tab_temporadas:
+        st.subheader("🗓️ Histórico por Temporadas")
+        st.caption("Cada temporada va de septiembre a agosto del año siguiente.")
 
+        grupos_temporada = columnas_por_temporada(columnas_meses)
 
-        components.html(
-            """
-            <div style="display: flex; justify-content: center;">
-                <iframe src="https://lichess.org/tv/rapid/frame?theme=brown&bg=dark" 
-                        style="width: 100%; max-width: 600px; height: 660px;" 
-                        allowtransparency="true" 
-                        frameborder="0">
-                </iframe>
-            </div>
-            """,
-            height=680  
-        )
+        if not grupos_temporada:
+            st.info("Aún no hay columnas de meses en el archivo para agrupar por temporada.")
+        else:
+            temporadas_disponibles = list(grupos_temporada.keys())
+            temporada_elegida = st.selectbox(
+                "📅 Temporada:", options=temporadas_disponibles,
+                index=len(temporadas_disponibles) - 1, key="temporada_sel",
+            )
+
+            columnas_de_esta_temporada = grupos_temporada[temporada_elegida]
+            df_activos_temp = df_base[df_base["Estado_Club"].str.lower().isin(["activo", "alta"])].copy()
+
+            filas_temporada = []
+            for _, fila in df_activos_temp.iterrows():
+                stats = stats_temporada_jugador(fila, columnas_de_esta_temporada)
+                if stats is not None:
+                    stats["Nombre"] = fila["Nombre"]
+                    filas_temporada.append(stats)
+
+            if not filas_temporada:
+                st.info(f"Ningún jugador activo tiene datos registrados en la temporada {temporada_elegida}.")
+            else:
+                df_temporada = pd.DataFrame(filas_temporada)
+                df_temporada = df_temporada.sort_values("Diferencia", ascending=False).reset_index(drop=True)
+                df_temporada.index = df_temporada.index + 1
+
+                cols_orden = ["Nombre", "Mes Inicio", "Elo Inicio", "Mes Fin", "Elo Fin",
+                              "Diferencia", "Pico Temporada"]
+                st.dataframe(df_temporada[cols_orden], use_container_width=True)
+                st.caption(
+                    "«Mes Inicio»/«Mes Fin» son el primer y último dato disponible de cada "
+                    "jugador dentro de la temporada — si alguien se apuntó a mitad de temporada, "
+                    "no se fuerza ningún mes concreto."
+                )
+
+    # =========================================================
+    # PESTAÑA 6: TERCERA DE MADRID (HTML embebido)
+    # =========================================================
+    with tab_tercera:
+        try:
+            with open("tercera_madrid.html", "r", encoding="utf-8") as f:
+                html_tercera = f.read()
+            components.html(html_tercera, height=1000, scrolling=True)
+        except FileNotFoundError:
+            st.error(
+                "No se encuentra el fichero 'tercera_madrid.html' en la raíz del repositorio. "
+                "Súbelo junto a app.py para que esta pestaña funcione."
+            )
 
 else:
     st.warning("Aún no hay datos de jugadores disponibles.")
