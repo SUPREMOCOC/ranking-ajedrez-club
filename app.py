@@ -195,13 +195,12 @@ if not df_base.empty:
     COLUMNAS_FIJAS = ["Nombre", "ID_FIDE", "Estado_Club", "Elo_Actual", "Max_Elo", "Fecha_Record"]
     columnas_meses = [col for col in df_base.columns if col not in COLUMNAS_FIJAS and "Unnamed" not in col]
 
-    tab_activos, tab_general, tab_hof, tab_evolucion, tab_temporadas, tab_tercera = st.tabs([
+    tab_activos, tab_general, tab_hof, tab_evolucion,tab_tercera = st.tabs([
         "🏃 Jugadores Activos",
         "👥 Club Completo (Todos)",
         "👑 Hall of Fame",
         "📈 Evolución Elo",
-        "🗓️ Temporadas",
-        "🏅 Tercera de Madrid"
+        "🏅 Liga Madrileña"
     ])
 
     # =========================================================
@@ -465,7 +464,7 @@ if not df_base.empty:
                         st.divider()
 
     # =========================================================
-    # PESTAÑA 5: TERCERA DE MADRID (HTML embebido)
+    # PESTAÑA 5: LIGA MADRILEÑA (HTML embebido)
     # =========================================================
     with tab_tercera:
         try:
