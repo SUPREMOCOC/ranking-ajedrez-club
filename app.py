@@ -465,51 +465,7 @@ if not df_base.empty:
                         st.divider()
 
     # =========================================================
-    # PESTAÑA 5: TEMPORADAS
-    # =========================================================
-    with tab_temporadas:
-        st.subheader("🗓️ Histórico por Temporadas")
-        st.caption("Cada temporada va de septiembre a agosto del año siguiente.")
-
-        grupos_temporada = columnas_por_temporada(columnas_meses)
-
-        if not grupos_temporada:
-            st.info("Aún no hay columnas de meses en el archivo para agrupar por temporada.")
-        else:
-            temporadas_disponibles = list(grupos_temporada.keys())
-            temporada_elegida = st.selectbox(
-                "📅 Temporada:", options=temporadas_disponibles,
-                index=len(temporadas_disponibles) - 1, key="temporada_sel",
-            )
-
-            columnas_de_esta_temporada = grupos_temporada[temporada_elegida]
-            df_activos_temp = df_base[df_base["Estado_Club"].str.lower().isin(["activo", "alta"])].copy()
-
-            filas_temporada = []
-            for _, fila in df_activos_temp.iterrows():
-                stats = stats_temporada_jugador(fila, columnas_de_esta_temporada)
-                if stats is not None:
-                    stats["Nombre"] = fila["Nombre"]
-                    filas_temporada.append(stats)
-
-            if not filas_temporada:
-                st.info(f"Ningún jugador activo tiene datos registrados en la temporada {temporada_elegida}.")
-            else:
-                df_temporada = pd.DataFrame(filas_temporada)
-                df_temporada = df_temporada.sort_values("Diferencia", ascending=False).reset_index(drop=True)
-                df_temporada.index = df_temporada.index + 1
-
-                cols_orden = ["Nombre", "Mes Inicio", "Elo Inicio", "Mes Fin", "Elo Fin",
-                              "Diferencia", "Pico Temporada"]
-                st.dataframe(df_temporada[cols_orden], use_container_width=True)
-                st.caption(
-                    "«Mes Inicio»/«Mes Fin» son el primer y último dato disponible de cada "
-                    "jugador dentro de la temporada — si alguien se apuntó a mitad de temporada, "
-                    "no se fuerza ningún mes concreto."
-                )
-
-    # =========================================================
-    # PESTAÑA 6: TERCERA DE MADRID (HTML embebido)
+    # PESTAÑA 5: TERCERA DE MADRID (HTML embebido)
     # =========================================================
     with tab_tercera:
         try:
