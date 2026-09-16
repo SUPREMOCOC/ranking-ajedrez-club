@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tercera de Madrid — equipos por club</title>
+<style>
+  :root {
+    --bg: #F5F2EA;
+    --surface: #FBFAF6;
+    --ink: #201F1C;
+    --ink-muted: #6B6558;
+    --line: #DED6C2;
+    --accent: #2F6B4F;
+    --accent-soft: #E4EFE9;
+    --gold: #A9781C;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .root {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 20px 40px;
+  }
+  .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .title {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    font-size: 13.5px;
+    color: var(--ink-muted);
+    margin: 0;
+    max-width: 48ch;
+    line-height: 1.5;
+  }
+  .count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .search {
+    width: 100%;
+    font-size: 14px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    margin-bottom: 16px;
+    font-family: inherit;
+  }
+  .search:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .detail {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px 18px 12px;
+    margin-bottom: 18px;
+    display: none;
+  }
+  .detail.show { display: block; }
+  .detail h2 {
+    font-family: var(--serif);
+    font-size: 19px;
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .chip {
+    font-size: 12px;
+    font-family: var(--mono);
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 4px 9px;
+    border-radius: 4px;
+  }
+  .chip.gold { background: #F3E8CC; color: var(--gold); }
+  .chart-wrap { width: 100%; overflow: hidden; }
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 480px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #EFEADB;
+    z-index: 2;
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 11.5px;
+    color: var(--ink-muted);
+    padding: 9px 8px;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    text-align: center;
+  }
+  thead th:hover { color: var(--ink); }
+  thead th.th-club { text-align: left; left: 0; z-index: 3; }
+  thead th.active { color: var(--accent); }
+  .arrow { margin-left: 3px; font-size: 10px; }
+  td {
+    padding: 7px 8px;
+    border-bottom: 1px solid #EEE8D8;
+    font-family: var(--mono);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  td.td-club {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-align: left;
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover td { background: #F1ECDD; }
+  tbody tr.selected td { background: var(--accent-soft); }
+  tbody tr.selected td.td-club { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .empty-cell { color: #C9C0AC; }
+  .peak { font-weight: 700; text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 2px; text-underline-offset: 2px; }
+  .foot { margin-top: 14px; font-size: 11.5px; color: var(--ink-muted); line-height: 1.6; }
+  .no-results td { text-align: center; padding: 20px; color: var(--ink-muted); }
+  @media (max-width: 560px) {
+    .root { padding: 20px 12px 32px; }
+    .title { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="root">
+  <div class="head">
+    <div>
+      <p class="title">Tercera de Madrid</p>
+      <p class="subtitle">Cuántos equipos tenía cada club en la liga por temporada, estimado a partir de la letra más alta usada por ese club (A, B, C…) dentro de Tercera cada año.</p>
+    </div>
+    <div class="count" id="countBox"></div>
+  </div>
+
+  <input class="search" type="text" id="search" placeholder="Buscar club…">
+
+  <div class="detail" id="detail">
+    <h2 id="detailName"></h2>
+    <div class="chips" id="detailChips"></div>
+    <div class="chart-wrap">
+      <svg id="chart" width="100%" height="200" viewBox="0 0 900 200" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr id="headerRow"></tr></thead>
+      <tbody id="bodyRows"></tbody>
+    </table>
+  </div>
+
+  <p class="foot">Toca un club para ver su evolución. El número subrayado en dorado marca su máximo histórico. Un guion indica que ese club no compitió en Tercera esa temporada.</p>
+</div>
+
+<script>
+const DATA = {"headers": ["2014/2015", "2015/2016", "2016/2017", "2017/2018", "2018/2019", "2019/2020", "2020/2021", "2021/2022", "2022/2023", "2023/2024", "2024/2025", "2025/2026"], "rows": [{"club": "LA CASA DEL AJEDREZ", "values": [11, 11, 9, 9, 10, 9, null, null, null, null, null, null]}, {"club": "TRES CANTOS", "values": [10, 10, 10, 10, 8, 7, 3, 4, 5, 6, 7, 7]}, {"club": "PUEBLO NUEVO", "values": [10, 9, 10, 10, 9, 9, 4, 5, 5, 6, 5, 5]}, {"club": "V CENTENARIO", "values": [8, 7, 6, 5, 9, 8, null, 9, 8, 8, 11, 10]}, {"club": "LA DIDACTICA", "values": [7, 7, 7, 7, 7, 7, null, null, 5, 5, 6, 6]}, {"club": "TAJAMAR", "values": [6, 6, 6, 6, 7, 6, 5, 6, 6, 7, 7, 7]}, {"club": "BLANCO Y NEGRO", "values": [6, 6, 6, 6, 6, 7, 7, 9, 10, 8, 8, 8]}, {"club": "ALCOBENDAS", "values": [6, 6, 5, 5, 6, 7, null, 4, 4, 4, 4, 4]}, {"club": "SAN VIATOR", "values": [6, 4, 4, 3, null, 2, null, 2, null, null, null, null]}, {"club": "ALCALA DE HENARES", "values": [5, 7, 6, 5, 5, 9, 4, 6, 6, 5, 5, 7]}, {"club": "TORREJON", "values": [5, 6, 6, 6, 7, 7, null, 6, 7, 6, 6, 6]}, {"club": "MOSTOLES", "values": [5, 6, 6, 5, 4, 4, 3, 6, 8, 6, 7, 8]}, {"club": "ALCORCON", "values": [5, 5, 6, 5, 3, 4, null, null, null, null, null, null]}, {"club": "RIVAS", "values": [5, 4, 5, 5, 4, 4, 2, 2, 3, 3, 4, 4]}, {"club": "64VILLALBA-MADRID CHESS ACADEMY", "values": [5, 4, 3, 4, 4, 4, 3, 3, 4, null, 3, 4]}, {"club": "CAPABLANCA", "values": [4, 7, 9, 9, 9, 7, null, 6, 6, 7, 6, 5]}, {"club": "GETAFE", "values": [4, 5, 6, 7, 8, 9, 6, 7, 7, 7, 6, 5]}, {"club": "EXPANSION", "values": [4, 5, 5, 5, 5, 4, null, 3, 4, 3, 4, 5]}, {"club": "MORATALAZ", "values": [4, 4, 5, 5, 4, 4, null, 3, 4, 6, 6, 6]}, {"club": "POZUELO", "values": [4, 4, 4, 5, 6, 5, null, 4, 4, 5, 6, 5]}, {"club": "MAGERIT", "values": [4, 4, 4, null, 4, 3, null, 1, 2, null, null, 2]}, {"club": "LEGANES", "values": [4, 4, 3, 3, 3, 4, null, 2, 2, 3, 3, 3]}, {"club": "COLLADO VILLALBA", "values": [4, 4, 3, null, 3, 3, null, 3, 3, 3, null, 2]}, {"club": "VALLECAS CDV", "values": [4, 4, null, 3, 3, null, null, 2, null, null, null, null]}, {"club": "SAN FERNANDO HENARES", "values": [3, 5, 4, 3, 4, null, 2, null, 3, 3, 3, 3]}, {"club": "LA BLANCA DE CANILLEJAS", "values": [3, 4, 4, 4, 4, 4, null, 4, 4, 4, 4, 4]}, {"club": "CASTILLA-LEON GET.", "values": [3, 4, 4, 4, null, null, null, null, null, null, null, null]}, {"club": "TORRELODONES", "values": [3, 4, 4, 3, 3, 3, null, 4, 3, 3, 3, 4]}, {"club": "VIRGEN DE ATOCHA", "values": [3, 3, 3, 3, 4, 4, null, 4, 4, 3, 3, 4]}, {"club": "ONCE", "values": [3, 3, 3, 3, 4, 4, null, 3, 4, 5, 4, 4]}, {"club": "SIERRA NORTE", "values": [3, 3, 3, 3, 4, 4, null, null, null, 2, 4, 5]}, {"club": "LA CORRALA LAVAPIES-CARTAGENA99", "values": [3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 3]}, {"club": "EL MOLINILLO", "values": [3, 3, 3, 3, 3, 3, 2, null, 2, 2, 2, 3]}, {"club": "LINO GOAS", "values": [3, 3, 3, 3, 3, 3, null, 2, 3, 4, 4, 4]}, {"club": "FUENLABRADA", "values": [3, 3, 3, 2, 3, 3, null, 3, 3, 3, 4, 4]}, {"club": "CIUDAD LOS ANGELES", "values": [3, 3, 2, 3, 3, 3, null, 3, 3, 4, 3, 2]}, {"club": "VILLAVICIOSA", "values": [2, 3, 4, 3, 4, 4, null, 2, 2, 2, null, 1]}, {"club": "TORRE DE EBOLI", "values": [2, 3, 3, 3, 3, 3, null, 2, 3, 4, 4, 4]}, {"club": "COLEGIO ALKOR", "values": [2, 3, 3, 2, 4, 4, null, 3, 4, 4, 3, 3]}, {"club": "VALLECAS VILLA", "values": [2, 2, 3, 4, 3, 4, null, 3, 3, 3, 3, 3]}, {"club": "COLMENAREJO CHESS", "values": [2, 2, 2, 4, 5, 5, 5, 5, 4, 5, 4, 4]}, {"club": "PARLA", "values": [2, 2, 2, 3, 3, 3, 2, 2, 3, 3, null, 3]}, {"club": "ALGETE", "values": [2, 2, 2, 2, 2, 3, 2, 3, 3, 4, 4, 4]}, {"club": "AGUSTINIANO", "values": [2, 2, 2, 2, 2, 2, null, 2, 3, 3, 3, 3]}, {"club": "BATAN", "values": [2, 2, 2, 2, 2, 2, null, 2, null, null, null, null]}, {"club": "COLEGIO MIRABAL", "values": [2, 2, 2, 2, 1, 1, null, null, null, null, null, null]}, {"club": "AMIGOS DEL AJEDREZ EDUCATIVO", "values": [2, 2, 1, 1, null, 2, null, 1, null, 1, null, 1]}, {"club": "SANTA MARIA DEL PILAR", "values": [2, 2, 1, null, null, null, null, null, null, null, null, null]}, {"club": "ELIPA", "values": [2, 2, null, 2, 2, 2, null, 2, 2, 2, 2, 2]}, {"club": "LOS ROSALES", "values": [2, 1, 1, null, null, null, null, null, null, 1, null, null]}, {"club": "VILLAVERDE", "values": [2, null, null, 3, 3, 3, null, 4, 4, 3, 3, null]}, {"club": "EUROPEO DE MADRID", "values": [2, null, null, null, null, null, null, null, null, null, null, null]}, {"club": "JAQUE DOBLE", "values": [2, null, null, null, null, null, null, null, null, null, null, null]}, {"club": "ARANJUEZ", "values": [1, 2, 3, null, null, 1, null, 3, 3, 2, 1, 2]}, {"club": "VALDEBERNARDO", "values": [1, 1, 2, 4, 5, 4, 2, 2, 3, 4, 4, 7]}, {"club": "CHAMBERI", "values": [1, 1, 1, 1, 1, 1, null, null, null, null, null, null]}, {"club": "COLMENAR VIEJO", "values": [1, 1, 1, 1, null, null, null, null, 2, 3, 3, 3]}, {"club": "GREDOS SAN DIEGO ALCALA", "values": [1, 1, 1, null, null, null, null, null, null, null, null, 1]}, {"club": "GREDOS S.DIEGO-EL ESCORIAL", "values": [1, 1, 1, null, null, null, null, null, null, null, null, null]}, {"club": "LEONTXO GARCIA", "values": [1, 1, null, 1, null, null, null, null, null, null, null, null]}, {"club": "SALESIANOS DE ATOCHA", "values": [1, 1, null, null, 1, 1, null, null, null, null, null, null]}, {"club": "ACROLA", "values": [1, 1, null, null, null, null, null, null, null, null, null, null]}, {"club": "ALPEDRETE", "values": [1, null, 2, 2, 2, 3, null, 4, 4, 4, 4, 4]}, {"club": "LUCENA", "values": [1, null, 1, null, 1, null, null, 1, null, null, 1, null]}, {"club": "FREGACEDOS", "values": [1, null, null, null, null, null, null, null, null, null, null, null]}, {"club": "MOMO", "values": [1, null, null, null, null, null, null, null, null, null, null, null]}, {"club": "VILLAREJO DE SALVANES", "values": [1, null, null, null, null, null, null, null, null, null, null, null]}, {"club": "ZOLA", "values": [1, null, null, null, null, null, null, null, null, null, null, null]}, {"club": "A.V.A.", "values": [null, 3, 3, 4, 5, 5, 2, 4, 5, 5, 5, 5]}, {"club": "JAQUE MATE", "values": [null, 2, 5, 7, 7, 7, 5, 7, 7, 7, 7, 5]}, {"club": "BARAJAS", "values": [null, 2, 2, 2, 2, 2, null, 2, 2, 3, 2, 3]}, {"club": "MONTPELLIER", "values": [null, 1, 3, 4, 3, 3, null, 3, 2, 2, 2, 1]}, {"club": "CATM SAN AGUSTIN", "values": [null, 1, 1, 1, 1, 2, null, 1, 1, null, null, null]}, {"club": "GREDOS SAN DIEGO LAS SUERTES", "values": [null, 1, null, 2, 2, 2, null, null, null, null, null, 2]}, {"club": "JAQUE Y MATE VENCEREMOS", "values": [null, null, 2, 3, 4, null, 1, null, null, null, 2, 1]}, {"club": "COSLADACHESS", "values": [null, null, 1, 3, 3, 3, null, 3, 3, 4, 4, 5]}, {"club": "2001", "values": [null, null, 1, 2, 1, 1, null, 1, 1, 2, 2, 2]}, {"club": "CASA EXTREMADURA EN LEGANES", "values": [null, null, 1, 1, 1, 1, null, null, 1, 1, 1, 1]}, {"club": "ALAMEDA DE OSUNA", "values": [null, null, 1, 1, null, null, null, null, null, null, null, null]}, {"club": "VALDENARRO", "values": [null, null, 1, null, null, null, null, null, null, 1, null, 1]}, {"club": "GREDOS-LAS ROZAS", "values": [null, null, 1, null, null, null, null, null, null, null, null, null]}, {"club": "GREDOS-MORATALAZ", "values": [null, null, 1, null, null, null, null, null, null, null, null, null]}, {"club": "LIBERTY CHESS", "values": [null, null, null, 2, null, 3, 2, 3, 2, 2, 2, 2]}, {"club": "CHESSLABRADA", "values": [null, null, null, 2, null, 1, null, null, null, null, null, null]}, {"club": "BANCO DE ESPAÑA", "values": [null, null, null, 1, null, 2, null, 1, 1, null, 1, 1]}, {"club": "DIAGONAL ALCORCON", "values": [null, null, null, null, 5, 6, 7, 9, 10, 11, 14, 13]}, {"club": "LICEUM", "values": [null, null, null, null, 3, 3, 2, 4, null, null, null, null]}, {"club": "MARGARITAS PROSPERANDO", "values": [null, null, null, null, 3, 3, null, 1, 2, 2, 1, null]}, {"club": "VALDEMORO", "values": [null, null, null, null, 1, 2, 2, 4, 4, 4, 3, 3]}, {"club": "CHAMBERI ACADEMIA", "values": [null, null, null, null, 1, 2, 1, 2, 3, 5, 5, 6]}, {"club": "MUSICHESS TRES CANTOS", "values": [null, null, null, null, 1, 2, 1, 2, null, 1, null, null]}, {"club": "AJEDREZ CON CABEZA", "values": [null, null, null, null, 1, 1, null, 5, 6, 9, 11, 12]}, {"club": "MANILA ESTRELLAS", "values": [null, null, null, null, null, 1, 1, null, 1, null, null, 1]}, {"club": "FILANTROPOS EQUIGOMA", "values": [null, null, null, null, null, 1, null, 2, null, 4, 4, 4]}, {"club": "AVANCE", "values": [null, null, null, null, null, 1, null, null, null, null, null, null]}, {"club": "JAQUE MATE-STELLA MARIS", "values": [null, null, null, null, null, 1, null, null, null, null, null, null]}, {"club": "LA ERA DE LA REINA", "values": [null, null, null, null, null, null, 3, 3, 3, 3, 2, 3]}, {"club": "LAS ROZAS REACCIONA", "values": [null, null, null, null, null, null, null, 2, 4, 4, 4, 4]}, {"club": "PEON DE DAMA LAS ROZAS", "values": [null, null, null, null, null, null, null, 1, 2, 1, 1, 1]}, {"club": "AKERU", "values": [null, null, null, null, null, null, null, 1, 1, 1, null, 1]}, {"club": "DELICIAS", "values": [null, null, null, null, null, null, null, null, 3, 4, 5, 5]}, {"club": "CALDEIRO", "values": [null, null, null, null, null, null, null, null, 2, 3, 2, 2]}, {"club": "CBA", "values": [null, null, null, null, null, null, null, null, 2, 2, 2, 2]}, {"club": "DAMA DEL JARAMA", "values": [null, null, null, null, null, null, null, null, 1, 1, 2, 2]}, {"club": "TORRES BLANCAS CDE", "values": [null, null, null, null, null, null, null, null, 1, 1, 2, 2]}, {"club": "JAQUE DIEM", "values": [null, null, null, null, null, null, null, null, 1, 1, 1, 2]}, {"club": "AL PASO", "values": [null, null, null, null, null, null, null, null, 1, 1, 1, 1]}, {"club": "EL TABLERO DE HOYO", "values": [null, null, null, null, null, null, null, null, 1, null, null, null]}, {"club": "CARABANCHEL", "values": [null, null, null, null, null, null, null, null, null, 1, 2, 4]}, {"club": "ARENALES", "values": [null, null, null, null, null, null, null, null, null, 1, 1, null]}, {"club": "EDITH STEIN", "values": [null, null, null, null, null, null, null, null, null, 1, null, null]}, {"club": "FLM EN EL PARQUE", "values": [null, null, null, null, null, null, null, null, null, null, 1, 1]}, {"club": "FRESNEDILLAS DE LA OLIVA", "values": [null, null, null, null, null, null, null, null, null, null, 1, 1]}, {"club": "PEON TORRE", "values": [null, null, null, null, null, null, null, null, null, null, 1, 1]}, {"club": "PEON TORRE", "values": [null, null, null, null, null, null, null, null, null, null, 1, 1]}, {"club": "GREDOS SAN DIEGO ALCALA", "values": [null, null, 1, null, null, null, null, null, null, null, null, 1]}, {"club": "GREDOS SAN DIEGO ALCALA", "values": [null, null, null, null, null, null, null, null, null, null, null, 1]}, {"club": "GREDOS-LAS ROZAS", "values": [null, null, 1, null, null, null, null, null, null, null, null, null]}, {"club": "GREDOS-MORATALAZ", "values": [null, null, 1, null, null, null, null, null, null, null, null, null]}]};
+const SEASONS = DATA.headers;
+const SHORT = SEASONS.map(s => { const [a,b] = s.split("/"); return a.slice(2) + "/" + b.slice(2); });
+
+const KEEP_UPPER = new Set(["A.V.A.","O.N.C.E.","CDE","CDV","CATM","FLM"]);
+function titleCase(name) {
+  return name.split(" ").map(word => {
+    const bare = word.replace(/[().,]/g, "");
+    if (KEEP_UPPER.has(bare) || /^\d/.test(word) || word.length <= 2) return word;
+    return word.charAt(0) + word.slice(1).toLowerCase();
+  }).join(" ");
+}
+
+function peakInfo(values) {
+  let idx = -1, max = -Infinity;
+  values.forEach((v,i) => { if (v !== null && v > max) { max = v; idx = i; } });
+  return idx === -1 ? null : { idx, value: max };
+}
+
+let query = "";
+let sortIdx = SEASONS.length - 1;
+let sortDir = "desc";
+let selectedClub = null;
+
+document.getElementById("countBox").innerHTML =
+  DATA.rows.length + " clubes &middot; " + SEASONS.length + " temporadas<br>2014/2015 &ndash; 2025/2026";
+
+function getRows() {
+  const q = query.trim().toLowerCase();
+  let r = DATA.rows.filter(row => row.club.toLowerCase().includes(q));
+  r.sort((a,b) => {
+    if (sortIdx === -1) {
+      return sortDir === "asc" ? a.club.localeCompare(b.club) : b.club.localeCompare(a.club);
+    }
+    const av = a.values[sortIdx], bv = b.values[sortIdx];
+    const an = av === null ? -1 : av, bn = bv === null ? -1 : bv;
+    return sortDir === "asc" ? an - bn : bn - an;
+  });
+  return r;
+}
+
+function renderHeader() {
+  const tr = document.getElementById("headerRow");
+  tr.innerHTML = "";
+  const thClub = document.createElement("th");
+  thClub.className = "th-club" + (sortIdx === -1 ? " active" : "");
+  thClub.innerHTML = "Club" + (sortIdx === -1 ? '<span class="arrow">' + (sortDir === "desc" ? "\u25BC" : "\u25B2") + '</span>' : "");
+  thClub.onclick = () => { handleHeader(-1); };
+  tr.appendChild(thClub);
+  SHORT.forEach((s, i) => {
+    const th = document.createElement("th");
+    th.className = sortIdx === i ? "active" : "";
+    th.innerHTML = s + (sortIdx === i ? '<span class="arrow">' + (sortDir === "desc" ? "\u25BC" : "\u25B2") + '</span>' : "");
+    th.onclick = () => { handleHeader(i); };
+    tr.appendChild(th);
+  });
+}
+
+function handleHeader(idx) {
+  if (sortIdx === idx) { sortDir = sortDir === "desc" ? "asc" : "desc"; }
+  else { sortIdx = idx; sortDir = "desc"; }
+  renderAll();
+}
+
+function renderBody() {
+  const rows = getRows();
+  const tbody = document.getElementById("bodyRows");
+  tbody.innerHTML = "";
+  if (rows.length === 0) {
+    const tr = document.createElement("tr");
+    tr.className = "no-results";
+    const td = document.createElement("td");
+    td.colSpan = SEASONS.length + 1;
+    td.textContent = 'Sin resultados para "' + query + '"';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+  rows.forEach(row => {
+    const peak = peakInfo(row.values);
+    const tr = document.createElement("tr");
+    if (row.club === selectedClub) tr.className = "selected";
+    tr.onclick = () => {
+      selectedClub = selectedClub === row.club ? null : row.club;
+      renderAll();
+    };
+    const tdClub = document.createElement("td");
+    tdClub.className = "td-club";
+    tdClub.textContent = titleCase(row.club);
+    tr.appendChild(tdClub);
+    row.values.forEach((v, i) => {
+      const td = document.createElement("td");
+      if (peak && peak.idx === i) td.className = "peak";
+      if (v === null) {
+        const span = document.createElement("span");
+        span.className = "empty-cell";
+        span.textContent = "\u2013";
+        td.appendChild(span);
+      } else {
+        td.textContent = v;
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function renderDetail() {
+  const box = document.getElementById("detail");
+  if (!selectedClub) { box.classList.remove("show"); return; }
+  const row = DATA.rows.find(r => r.club === selectedClub);
+  if (!row) { box.classList.remove("show"); return; }
+  box.classList.add("show");
+  document.getElementById("detailName").textContent = titleCase(row.club);
+
+  const peak = peakInfo(row.values);
+  const activeSeasons = row.values.filter(v => v !== null).length;
+  let lastIdx = -1;
+  for (let i = row.values.length - 1; i >= 0; i--) { if (row.values[i] !== null) { lastIdx = i; break; } }
+
+  const chips = document.getElementById("detailChips");
+  chips.innerHTML = "";
+  if (peak) {
+    const c = document.createElement("span");
+    c.className = "chip gold";
+    c.textContent = "Máximo " + peak.value + " equipos · " + SHORT[peak.idx];
+    chips.appendChild(c);
+  }
+  if (lastIdx !== -1) {
+    const c = document.createElement("span");
+    c.className = "chip";
+    c.textContent = "Última temporada jugada: " + SEASONS[lastIdx] + " (" + row.values[lastIdx] + ")";
+    chips.appendChild(c);
+  }
+  const c2 = document.createElement("span");
+  c2.className = "chip";
+  c2.textContent = activeSeasons + " temporadas en Tercera";
+  chips.appendChild(c2);
+
+  drawChart(row.values);
+}
+
+function drawChart(values) {
+  const svg = document.getElementById("chart");
+  const W = 900, H = 200, padL = 30, padR = 14, padT = 14, padB = 22;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const maxVal = Math.max(1, ...values.filter(v => v !== null));
+  const n = values.length;
+  const xStep = n > 1 ? plotW / (n - 1) : 0;
+
+  function xAt(i) { return padL + i * xStep; }
+  function yAt(v) { return padT + plotH - (v / maxVal) * plotH; }
+
+  let svgContent = "";
+  // gridlines (horizontal, 4 steps)
+  const gridSteps = 4;
+  for (let g = 0; g <= gridSteps; g++) {
+    const val = Math.round((maxVal / gridSteps) * g);
+    const y = yAt(val);
+    svgContent += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#DED6C2" stroke-width="1"/>';
+    svgContent += '<text x="' + (padL - 6) + '" y="' + (y + 3) + '" font-size="10" fill="#6B6558" text-anchor="end" font-family="ui-monospace, monospace">' + val + '</text>';
+  }
+  // x labels
+  SHORT.forEach((s, i) => {
+    svgContent += '<text x="' + xAt(i) + '" y="' + (H - 4) + '" font-size="10" fill="#6B6558" text-anchor="middle" font-family="ui-monospace, monospace">' + s + '</text>';
+  });
+  // line segments (break on null)
+  let pathParts = [];
+  let current = [];
+  values.forEach((v, i) => {
+    if (v === null) {
+      if (current.length > 1) pathParts.push(current);
+      current = [];
+    } else {
+      current.push([xAt(i), yAt(v)]);
+    }
+  });
+  if (current.length > 1) pathParts.push(current);
+  pathParts.forEach(pts => {
+    const d = pts.map((p, idx) => (idx === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+    svgContent += '<path d="' + d + '" fill="none" stroke="#2F6B4F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+  });
+  // dots
+  values.forEach((v, i) => {
+    if (v !== null) {
+      svgContent += '<circle cx="' + xAt(i) + '" cy="' + yAt(v) + '" r="3.2" fill="#2F6B4F"><title>' + SEASONS[i] + ': ' + v + ' equipos</title></circle>';
+    }
+  });
+
+  svg.innerHTML = svgContent;
+}
+
+function renderAll() {
+  renderHeader();
+  renderBody();
+  renderDetail();
+}
+
+document.getElementById("search").addEventListener("input", (e) => {
+  query = e.target.value;
+  renderAll();
+});
+
+renderAll();
+</script>
+</body>
+</html>
