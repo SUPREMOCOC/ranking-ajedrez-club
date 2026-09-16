@@ -195,12 +195,13 @@ if not df_base.empty:
     COLUMNAS_FIJAS = ["Nombre", "ID_FIDE", "Estado_Club", "Elo_Actual", "Max_Elo", "Fecha_Record"]
     columnas_meses = [col for col in df_base.columns if col not in COLUMNAS_FIJAS and "Unnamed" not in col]
 
-    tab_activos, tab_general, tab_hof, tab_evolucion,tab_tercera = st.tabs([
+    tab_activos, tab_general, tab_hof, tab_evolucion, tab_tercera, tab_lichess = st.tabs([
         "🏃 Jugadores Activos",
         "👥 Club Completo (Todos)",
         "👑 Hall of Fame",
         "📈 Evolución Elo",
-        "🏅 Liga Madrileña"
+        "🏅 Liga Madrileña",
+        "📺 Lichess TV"
     ])
 
     # =========================================================
@@ -476,6 +477,14 @@ if not df_base.empty:
                 "No se encuentra el fichero 'tercera_madrid.html' en la raíz del repositorio. "
                 "Súbelo junto a app.py para que esta pestaña funcione."
             )
+
+    # =========================================================
+    # PESTAÑA 6: LICHESS TV
+    # =========================================================
+    with tab_lichess:
+        st.subheader("📺 Lichess TV en Directo")
+        st.write("Sigue las mejores partidas en vivo retransmitidas por Lichess.")
+        components.iframe("https://lichess.org/tv/frame?theme=dark&bg=dark", height=480, scrolling=False)
 
 else:
     st.warning("Aún no hay datos de jugadores disponibles.")
